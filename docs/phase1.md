@@ -25,12 +25,7 @@
 
 ### 2. Technology Deep Dive
 
-  - Cloud provider: AWS
-  - Libraries:
-    - crawling
-    - indexing
-    - queuing
-    - storage
+
 
 ---
 
