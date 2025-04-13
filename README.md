@@ -23,7 +23,6 @@ This project follows a modular microservice-based architecture:
 - **Search API**: Serves user queries.
 - **Monitoring & Logs**: Tracks task status and system health.
 
-> See detailed [Architecture Docs](docs/architecture.md) for diagrams and flow.
 
 ---
 
