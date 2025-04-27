@@ -86,13 +86,13 @@
 
 - **Architecture Diagrams**:
   
-  ![](A:\OneDrive\.ENG\.SP25\3.%20Distributed_System\proj\git\assests\sysArch.png)
+  ![](./assests/sysArch.png)
 
 <div style="page-break-before:always;"></div>
 
 - **Data Flow**:
   
-  ![](A:\OneDrive\.ENG\.SP25\3.%20Distributed_System\proj\git\assests\DataFlow.png)
+  ![](./assests/DataFlow.png)
 
 - **API/Interface**
 
@@ -100,7 +100,7 @@
 
 - **Storage Schemas**
   
-  ![](A:\OneDrive\.ENG\.SP25\3.%20Distributed_System\proj\git\assests\DB.png)
+  ![](./assests/DB.png)
 
 - **Class Diagram**
 
@@ -108,7 +108,7 @@
 
 - **Fault Tolerance**
   
-  ![](A:\OneDrive\.ENG\.SP25\3.%20Distributed_System\proj\git\assests\RiskMatrix.jpg)
+  ![](./assests/RiskMatrix.jpg)
   
   * **Parse Error:** A single webpage's structure causes a parser instance to fail; recovery is typically automatic with minimal impact.
   * **Indexer Loss:** An indexer node fails losing in-progress index updates before they are stored; requires reprocessing from the queue.
