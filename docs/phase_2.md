@@ -371,19 +371,164 @@ This implementation:
      ```
 
 
+
 ## 2. Integration and Workflow
 
-* **End-to-End Crawl Flow:** 
-* **End-to-End Indexing Flow:**
-* **Integration Points:** 
+### **End-to-End Crawl Flow:** 
+   - txt
+### **End-to-End Indexing Flow:**
+   - txt
+### **Integration Points:** 
+
+1. **Master Node to Task Queue Integration:**
+   - Master node creates and distributes tasks
+   - Tasks are routed to appropriate queues
+   - Results are collected and processed
+   - System state is maintained through Redis
+
+2. **Crawler to Indexer Integration:**
+   ```python
+   @app.task(bind=True, name='tasks.crawl_url')
+   def crawl_url(self, url: str, task_id: str) -> Dict[str, Any]:
+       # ... crawling logic ...
+       # Send content to indexer
+       index_content.delay(content)
+   ```
+   - Crawlers extract content and URLs
+   - Content is sent to indexer queue
+   - Indexers process and store content
+   - Results are tracked and monitored
+
+3. **Node Health Monitoring Integration:**
+   ```python
+   def monitor_node_health(self):
+       """Monitor node health through heartbeats."""
+       current_time = time.time()
+       dead_nodes = []
+       
+       for node_id in self.active_nodes:
+           if current_time - self.node_health[node_id] > self.heartbeat_timeout:
+               dead_nodes.append(node_id)
+   ```
+   - Heartbeat system for node health
+   - Automatic failure detection
+   - Task reassignment on failures
+   - System state monitoring
+
+4. **MPI Integration for Distributed Computing:**
+   ```python
+   class MasterNode:
+       def __init__(self):
+           self.comm = MPI.COMM_WORLD
+           self.rank = self.comm.Get_rank()
+           self.size = self.comm.Get_size()
+   ```
+   - Node coordination through MPI
+   - Distributed task processing
+   - Node communication
+   - System scaling
+
+* **Workflow Diagram:**
+```mermaid
+graph TD
+    A[Master Node] -->|Create Tasks| B[Task Queue]
+    B -->|Distribute| C[Crawler Nodes]
+    C -->|Extract Content| D[Indexer Nodes]
+    C -->|Discover URLs| A
+    D -->|Store Results| E[Result Backend]
+    A -->|Monitor Health| F[Health Monitoring]
+    F -->|Heartbeats| C
+    F -->|Heartbeats| D
+```
+
+* **Data Flow:**
+1. **Task Creation and Distribution:**
+   ```python
+   def assign_tasks_to_crawlers(self, batch: List[str]) -> None:
+       for url in batch:
+           task = crawl_url.apply_async(
+               args=[url, task_id],
+               queue=self.crawler_queue
+           )
+   ```
+
+2. **Content Processing:**
+   ```python
+   @app.task(bind=True, name='tasks.crawl_url')
+   def crawl_url(self, url: str, task_id: str):
+       # Fetch and parse content
+       response = requests.get(url, timeout=10)
+       soup = BeautifulSoup(response.text, 'html.parser')
+       
+       # Extract data
+       content = {
+           'title': soup.title.string,
+           'text': soup.get_text(),
+           'url': url
+       }
+       
+       # Send to indexer
+       index_content.delay(content)
+   ```
+
+3. **Result Processing:**
+   ```python
+   def process_task_results(self):
+       for task_id, result in self.task_results.items():
+           if result.ready():
+               task_result = result.get()
+               # Process results
+               if 'new_urls' in task_result:
+                   self.urls_to_crawl.update(new_urls)
+   ```
+
+* **Error Handling and Recovery:**
+1. **Task Level:**
+   - Automatic retries for failed tasks
+   - Error logging and tracking
+   - Task state maintenance
+
+2. **Node Level:**
+   - Node failure detection
+   - Task reassignment
+   - System state recovery
+
+3. **System Level:**
+   - Graceful shutdown
+   - State persistence
+   - Cleanup procedures
+
+* **Monitoring and Metrics:**
+```python
+self.metrics = {
+    'tasks_created': 0,
+    'tasks_completed': 0,
+    'tasks_failed': 0,
+    'urls_discovered': 0,
+    'node_failures': 0,
+    'start_time': time.time()
+}
+```
+
+* **Integration Testing:**
+1. **Component Testing:**
+   - Individual component functionality
+   - Queue communication
+   - Task processing
+   - Node health monitoring
+
+2. **System Testing:**
+   - End-to-end workflow
+   - Error handling
+   - Performance metrics
+   - System scalability
+
+
 
 ## 3. Testing and Results
 
 * **Unit Testing:** 
-  
-  - Master Node:
-    
-    
+
   
   - Crawler Node/s:
     
