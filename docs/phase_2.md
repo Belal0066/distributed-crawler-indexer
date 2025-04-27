@@ -6,14 +6,18 @@
 
 <div align="center"> Course Name: <strong>Distributed Computing</strong> </div>
 <div align="center"> Course Code: <strong>CSE354</strong> </div>
-<div align="center"> Academic Year: <strong>Spring 2024</strong></div>
+<div align="center"> Academic Year: <strong>Spring 2025</strong></div>
 
-| Student Name                    | ID(ASU)     |
-| ------------------------------- |:-----------:|
-| **Omar Osama**                  | **2101757** |
-| **Ahmed Mohamed Salah**         | **2100669** |
-| **Ahmad Muhammad Abdelmaksoud** | **2101077** |
-| **Belal Anas Seddik Awad**      | **21P0072** |
+| Student Name                   | ID(ASU)     |
+| ------------------------------ |:-----------:|
+| **Ahmad Muhammad Abelmaksoud** | **2101077** |
+| **Ahmed Mohamed Salah**        | **2100669** |
+| **Belal Anas Seddik Awad**     | **21P0072** |
+| **Omar Osama Abdelkarim**      | **2101757** |
+
+## **Team: 4**
+
+---
 
 # Project: Distributed Web Crawling and Indexing System using Cloud Computing
 
@@ -21,7 +25,7 @@
 
     **Dr. Ayman Bahaa**
 
-    **Eng. A'laa and Ashraf**
+    **Eng. A'laa and Mostafa**
 
 <div style="page-break-before:always;"></div>
 
@@ -41,7 +45,7 @@
 
 ---
 
-**Table of Contetns**
+**Table of Contents**
 
 1. [Component Implementation Details](#1-component-implementation-details)
    - [Master Node](#11-master-node)
@@ -471,15 +475,7 @@ This implementation:
 
 ## 2. Integration and Workflow
 
-### **End-to-End Crawl Flow:**
-
-- txt
-  
-  ### **End-to-End Indexing Flow:**
-
-- txt
-  
-  ### **Integration Points:**
+- ### **Integration Points:**
 1. **Master Node to Task Queue Integration:**
    
    - Master node creates and distributes tasks
@@ -639,7 +635,8 @@ graph TD
 
 ## 3. Testing and Results
 
-* **Unit Testing:** 
+**Unit Testing:** 
+
 - Crawler Node/s:
 
 The Crawler Node was tested by running it against a sample set of URLs (`example.com`, `books.toscrape.com`) to validate successful fetching, parsing, and structured data extraction.
@@ -666,7 +663,6 @@ The crawler output was saved into a local JSON file (`temp.json`).
   }
 ```
 
-- Indexer Node/s:
 * **Integration Testing:** 
   
   ```sh
