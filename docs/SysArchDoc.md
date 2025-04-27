@@ -81,7 +81,7 @@ The system employs a distributed, microservices-oriented architecture leveraging
 
 ### 2.3 Data Flow Diagram
 
-![Data Flow Diagram](./assests/DataFlow.png)
+![](./assests/DataFlow.png)
 
 *Diagram Description:* This diagram illustrates the primary dynamic flow of data through the system:
     1.  **Initiation:** User submits Seed URLs/Params via the Client to the Seed Loader/Master. Seeds are stored.
@@ -149,7 +149,7 @@ Designing for failure is critical in a distributed system.
 
 ### 4.1 Risk Assessment Matrix
 
-![Risk Assessment Matrix](A:\OneDrive\.ENG\.SP25\3.%20Distributed_System\proj\git\assests\RiskMatrix.jpg)
+![](./assests/RiskMatrix.jpg)
 
 *Diagram Description:* This matrix identifies potential risks based on their likelihood (Rare, Moderate, Very Likely) and impact (Minor, Major, Extreme) *before* mitigation. Key risks include:
     *   **Parse Error (Rare, Minor):** Isolated parser failure on malformed HTML.
