@@ -228,7 +228,65 @@
 ### 1.4. Task Queues
 
 * **Queues Created:** 
+  - `crawler_queue`: Dedicated queue for URL crawling tasks
+  - `indexer_queue`: Queue for content indexing tasks
+  - `monitoring_queue`: Queue for system health monitoring and heartbeats
+
 * **Purpose & Message Format:** 
+  ```python
+  # Queue Configuration
+  app.conf.update(
+      task_serializer='json',
+      accept_content=['json'],
+      result_serializer='json',
+      timezone='UTC',
+      enable_utc=True,
+      worker_prefetch_multiplier=1,  # Process one task at a time
+      task_acks_late=True,  # Tasks are acknowledged after completion
+      task_track_started=True,  # Track when tasks are started
+      task_routes={
+          'tasks.crawl_url': {'queue': 'crawler_queue'},
+          'tasks.index_content': {'queue': 'indexer_queue'},
+          'tasks.heartbeat': {'queue': 'monitoring_queue'}
+      }
+  )
+  ```
+
+* **Message Types & Formats:**
+
+  1. **Crawler Tasks:**
+     ```python
+     {
+         'task_id': str,          # Unique task identifier
+         'url': str,              # URL to crawl
+         'status': str,           # Task status
+         'new_urls': List[str],   # Discovered URLs
+         'timestamp': float       # Task creation time
+     }
+     ```
+
+  2. **Indexer Tasks:**
+     ```python
+     {
+         'content': {
+             'title': str,        # Page title
+             'text': str,         # Page content
+             'url': str           # Source URL
+         },
+         'status': str,          # Indexing status
+         'timestamp': float      # Task creation time
+     }
+     ```
+
+  3. **Heartbeat Messages:**
+     ```python
+     {
+         'node_id': str,         # Node identifier
+         'status': str,          # Node status
+         'timestamp': float      # Heartbeat time
+     }
+     ```
+
 
 ## 2. Integration and Workflow
 
