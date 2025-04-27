@@ -27,7 +27,7 @@
 
 # Phase 1: Project Inception and Core Architecture
 
-## Focus
+## Objective
 
 - Establish project foundations
 - Define and document core architecture
