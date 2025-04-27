@@ -374,9 +374,11 @@ This implementation:
 
 ## 2. Integration and Workflow
 
-* **End-to-End Crawl Flow:** 
-* **End-to-End Indexing Flow:**
-* **Integration Points:** 
+### **End-to-End Crawl Flow:** 
+   - txt
+### **End-to-End Indexing Flow:**
+   - txt
+### **Integration Points:** 
 
 1. **Master Node to Task Queue Integration:**
    - Master node creates and distributes tasks
