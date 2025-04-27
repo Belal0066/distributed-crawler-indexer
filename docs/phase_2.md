@@ -35,7 +35,7 @@
 
 - **Communication**: Crawlers send URLs, status, and content via queues.
 
-- **Indexer**: Store page content in a searchable index (e.g., Whoosh).
+- **Indexer**: Store page content in a searchable index.
 
 - **Integration**: Connect all components into a working system.
 
