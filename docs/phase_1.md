@@ -149,7 +149,16 @@
 <div style="page-break-before:always;"></div>
 
 ### 3. System Design
-
+  The distributed web crawling and indexing system is designed with a focus on scalability, fault tolerance, and efficient data processing. The system architecture follows a master-worker pattern, where a central master node coordinates multiple crawler and indexer nodes. This design allows for parallel processing of web pages and distributed indexing, enabling the system to handle large-scale web crawling tasks efficiently.
+  
+  The system's components are distributed across cloud-based virtual machines, with each component having specific responsibilities:
+  - The master node manages task distribution and monitors worker health
+  - Crawler nodes handle web page fetching and content extraction
+  - Indexer nodes process and store the crawled content in a searchable format
+  - A distributed task queue ensures reliable communication between components
+  - Cloud storage provides persistent data storage for crawled content and indexes
+  
+  This architecture enables the system to scale horizontally by adding more worker nodes as needed, while maintaining fault tolerance through replication and task redistribution mechanisms.
 - **Architecture Diagrams**:
   
   ![](./assests/sysArch.png)
