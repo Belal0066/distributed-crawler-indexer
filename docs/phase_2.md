@@ -58,16 +58,128 @@
 ### 1.1. Master Node
 
 * **Task Distribution:**
+  - Implements batch processing with configurable batch size (default: 10 URLs per batch)
+  - Uses Celery task queue for distributed task assignment
+  - Maintains separate queues for crawlers and indexers
+  - Implements task deduplication using sets (urls_to_crawl, processing_urls, completed_urls)
+  - Features automatic task reassignment on node failures
+  - Tracks task status and results using AsyncResult objects
 
 * **Result Handling:** 
+  - Processes completed tasks asynchronously
+  - Extracts new URLs from crawled pages
+  - Updates task metrics (created, completed, failed)
+  - Maintains URL state (to crawl, processing, completed)
+  - Implements error handling and recovery
+  - Logs detailed task completion status and metrics
 
 * **Libraries Used:** 
+  - `mpi4py`: For distributed computing and node communication
+  - `celery`: For task queue management and distribution
+  - `redis`: As message broker and result backend
+  - `logging`: For comprehensive system logging
+  - `typing`: For type hints and code documentation
+  - `uuid`: For generating unique task and batch IDs
+  - `time`: For timing operations and heartbeat management
 
 * **Code Snippet:**
   
   ```python
-  ###code
+  class MasterNode:
+      def __init__(self):
+          # MPI setup
+          self.comm = MPI.COMM_WORLD
+          self.rank = self.comm.Get_rank()
+          self.size = self.comm.Get_size()
+          
+          # Task management
+          self.urls_to_crawl: Set[str] = set()
+          self.processing_urls: Set[str] = set()
+          self.completed_urls: Set[str] = set()
+          self.task_results: Dict[str, AsyncResult] = {}
+          self.batch_size = 10
+          
+          # Performance metrics
+          self.metrics = {
+              'tasks_created': 0,
+              'tasks_completed': 0,
+              'tasks_failed': 0,
+              'urls_discovered': 0,
+              'node_failures': 0,
+              'start_time': time.time()
+          }
+
+      def assign_tasks_to_crawlers(self, batch: List[str]) -> None:
+          """Assign a batch of URLs to crawler nodes via the task queue."""
+          if not batch:
+              return
+              
+          batch_id = str(uuid.uuid4())
+          logger.info(f"Assigning batch {batch_id} with {len(batch)} URLs to crawlers")
+          
+          # Create tasks for the batch
+          tasks = []
+          for url in batch:
+              task_id = str(uuid.uuid4())
+              task = crawl_url.apply_async(
+                  args=[url, task_id],
+                  queue=self.crawler_queue,
+                  task_id=task_id
+              )
+              tasks.append(task)
+              self.task_results[task_id] = task
+              self.metrics['tasks_created'] += 1
+
+      def process_task_results(self):
+          """Process completed task results."""
+          completed_tasks = []
+          
+          for task_id, result in self.task_results.items():
+              if result.ready():
+                  try:
+                      task_result = result.get()
+                      
+                      # Process new URLs
+                      if 'new_urls' in task_result:
+                          new_urls = set(task_result['new_urls']) - self.completed_urls - self.processing_urls
+                          self.urls_to_crawl.update(new_urls)
+                          self.metrics['urls_discovered'] += len(new_urls)
+                      
+                      # Update URL states
+                      if 'url' in task_result:
+                          self.completed_urls.add(task_result['url'])
+                          self.processing_urls.discard(task_result['url'])
+                          self.metrics['tasks_completed'] += 1
+                      
+                      completed_tasks.append(task_id)
+                      
+                  except Exception as e:
+                      logger.error(f"Error processing task {task_id}: {e}")
+                      self.metrics['tasks_failed'] += 1
+                      completed_tasks.append(task_id)
+          
+          # Cleanup completed tasks
+          for task_id in completed_tasks:
+              del self.task_results[task_id]
   ```
+
+* **Key Features:**
+  - Distributed task processing using MPI
+  - Asynchronous task execution with Celery
+  - Robust error handling and recovery
+  - Comprehensive performance metrics
+  - Detailed logging and monitoring
+  - Automatic task reassignment on failures
+  - Efficient URL deduplication
+  - Configurable batch processing
+
+* **Performance Considerations:**
+  - Uses sets for O(1) URL lookup and deduplication
+  - Implements batch processing to reduce overhead
+  - Maintains task state for efficient tracking
+  - Implements heartbeat system for node health monitoring
+  - Features automatic cleanup of completed tasks
+  - Provides detailed metrics for performance monitoring
 
 ### 1.2. Crawler Node(s)
 
