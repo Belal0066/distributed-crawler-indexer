@@ -171,7 +171,7 @@ The cloud environment for this project was set up using **Amazon Web Services (A
 Three Amazon EC2 instances were created to serve as the **Master Node**, **Crawler Node**, and **Indexer Node**:
 
 - **Master Node**: 
-  - EC2 instance responsible for managing the entire web crawling process. It coordinates the crawling tasks and sends them to the Crawler Node using **SQS**.
+  - EC2 instance responsible for managing the entire web crawling process. It coordinates the crawling tasks and sends them to the Crawler Node.
 - **Crawler Node**:
   - EC2 instance responsible for fetching web pages based on URLs provided by the Master Node. It stores the crawled HTML content in **S3**.
 - **Indexer Node**:
