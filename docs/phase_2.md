@@ -27,7 +27,7 @@
 
 # Phase 2: Distributed Web Crawling and Indexing System
 
-## Focus
+## Objective
 
 - 
 
