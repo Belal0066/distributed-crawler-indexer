@@ -190,13 +190,10 @@ AWS RDS was selected for managing critical state tracking and metadata storage.
 - **Data Flow**:
   
   ![](./assests/DataFlow.png)
-
+  
+---
 - **API/Interface:**
-## 
-
-
-
-## 1. Client ↔ Master API
+### 1. Client ↔ Master API
 
 ### 1.1 Start Crawl
 
@@ -473,6 +470,57 @@ GET /api/v1/search
   ![](./assests/DB.png)
 
 - **Class Diagram**
+```mermaid
+classDiagram
+    class MasterNode {
+        -comm: MPI.COMM_WORLD
+        -rank: int
+        -size: int
+        -status: MPI.Status
+        -crawler_nodes: int
+        -indexer_nodes: int
+        -active_nodes: Set[int]
+        -node_health: Dict[int, float]
+        -heartbeat_timeout: int
+        -urls_to_crawl: Set[str]
+        -processing_urls: Set[str]
+        -completed_urls: Set[str]
+        -task_results: Dict[str, AsyncResult]
+        -batch_size: int
+        -crawler_queue: str
+        -indexer_queue: str
+        -metrics: Dict[str, Any]
+        -seed_urls: List[str]
+        +initialize() bool
+        +log_system_state()
+        +create_url_batch() List[str]
+        +assign_tasks_to_crawlers(batch: List[str])
+        +monitor_node_health()
+        +handle_node_failure(node_id: int)
+        +process_task_results()
+        +run()
+    }
+
+    class MPI {
+        +COMM_WORLD
+        +Status
+    }
+
+    class AsyncResult {
+        +ready()
+        +get()
+        +worker_pid
+        +args
+    }
+
+    class Celery {
+        +apply_async()
+    }
+
+    MasterNode --> MPI : uses
+    MasterNode --> AsyncResult : manages
+    MasterNode --> Celery : uses
+```
 
 <div style="page-break-before:always;"></div>
 
