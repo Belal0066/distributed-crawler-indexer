@@ -70,7 +70,73 @@
 
 - **Scrapy:** Integrated async engine, scheduling, middleware, and politeness protocols enable efficient, large-scale crawling beyond basic libraries.
 
-- **Elasticsearch:** Provides distributed, real-time indexing and scalable search/aggregation features, advantageous over embedded libraries or managing Solr.
+- **Elasticsearch:** Elasticsearch's node-based architecture is particularly well-suited for our distributed web crawling system, as it has these following properties:
+
+  1. ***Distributed Architecture & Scalability***
+    - Elasticsearch operates as a cluster of nodes (Elasticsearch instances)
+    - Each node is a running instance of Elasticsearch that can:
+      - Store data
+      - Process search requests
+      - Handle indexing operations
+    - Nodes can be added or removed from the cluster dynamically
+    - This distributed nature perfectly matches our project's need for scalable indexing
+  
+  2. ***Fault Tolerance Through Replication***
+    - Elasticsearch uses a sharding system where:
+      - Data is divided into shards (pieces)
+      - Each shard has a primary copy and replica copies
+      - Replicas are stored on different nodes
+    - If an Elasticsearch node fails:
+      - The primary shards on that node become unavailable
+      - Replica shards on other nodes are automatically promoted to primary status
+      - This ensures data remains accessible even during node failures
+    - This built-in replication system helps us meet our project's fault tolerance requirements
+  
+  3. ***Advanced Search Capabilities***
+    - Each Elasticsearch node can process search queries
+    - Built-in support for:
+      - Full-text search
+      - Boolean queries
+      - Phrase matching
+      - Relevance scoring
+    - This provides the robust search functionality required by our project
+  
+  4. ***Performance & Resource Management***
+    - Each Elasticsearch node can:
+      - Cache frequently accessed data
+      - Process queries in parallel
+      - Handle multiple indexing operations simultaneously
+    - This ensures efficient processing of our crawled content
+  
+  5. ***Integration & Communication***
+    - Elasticsearch nodes communicate through a REST API
+    - Python client (elasticsearch-py) provides easy integration
+    - Simple to connect our crawler nodes to the Elasticsearch cluster
+    - Nodes can be added or removed without application changes
+  
+  6. ***Cloud Deployment***
+    - Elasticsearch nodes can run on cloud VMs (like AWS EC2)
+    - Each VM can host one or more Elasticsearch nodes
+    - Example architecture:
+      ```
+      AWS EC2 Instance 1
+      └── Elasticsearch Node 1 (Primary Shards)
+      └── Elasticsearch Node 2 (Replica Shards)
+    
+      AWS EC2 Instance 2
+      └── Elasticsearch Node 3 (Primary Shards)
+      └── Elasticsearch Node 4 (Replica Shards)
+      ```
+    - This makes it easy to deploy in our cloud environment
+  
+  7. ***Monitoring & Health Checks***
+    - Each Elasticsearch node reports its status
+    - Built-in monitoring for:
+      - Node health
+      - Shard allocation
+      - Indexing performance
+      - Search performance
+    - Helps us track system health and performance
 
 - **Celery (with Redis):** Python-native distributed task framework using Redis for high-throughput/low-latency brokering, enabling finer application control than cloud queues.
 
