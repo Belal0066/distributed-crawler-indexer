@@ -29,11 +29,27 @@
 
 ## Objective
 
-- 
+- **Pipeline**: Master distributes URLs to Crawlers via message queue.
+
+- **Crawler**: Fetch pages, extract links/text, follow politeness.
+
+- **Communication**: Crawlers send URLs, status, and content via queues.
+
+- **Indexer**: Store page content in a searchable index (e.g., Whoosh).
+
+- **Integration**: Connect all components into a working system.
 
 ---
 
-# Table of Contents
+**Table of Contetns**
+
+1. [Component Implementation Details](#1-component-implementation-details)
+   - [Master Node](#11-master-node)
+   - [Crawler Node(s)](#12-crawler-nodes)
+   - [Indexer Node](#13-indexer-node)
+   - [Task Queues](#14-task-queues)
+2. [Integration and Workflow](#2-integration-and-workflow)
+3. [Testing and Results](#3-testing-and-results)
 
 ---
 
