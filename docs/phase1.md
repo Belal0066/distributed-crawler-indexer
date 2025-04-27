@@ -1,4 +1,4 @@
-# Phase 1: Project Inception and Core Architecture (Weeks 1–2)
+# Phase 1: Project Inception and Core Architecture
 
 ## Focus
 
@@ -22,8 +22,12 @@
 
 
 ### 2. Tech Stack:
-
-
+ - Programming Language: Python
+ - Web Crawling: Scrapy
+ - Indexing Libraries/Search Engines: Elasticsearch
+ - Distributed Task Queue: Celery (with Redis as brokers)
+ - Cloud Platform: AWS
+ - Database: AWS RDS 
 
 ---
 
@@ -46,6 +50,24 @@
 
 - **Fault Tolerance:**
 ![Risk Matrix](https://github.com/user-attachments/assets/94e293df-d837-4e14-a40b-7d6acde55ff2)
+
+- **Crawler Node Failover logic:**
+```mermaid
+flowchart TD
+Start(["Start Cycle"]) --> Check{"Heartbeat from N?"}
+Check -- No --> Fail["Mark N Failed"]
+Healthy --> Start
+Check -- Yes --> Healthy["Mark N Healthy"]
+Fail --> Log["Log Failure"]
+Log --> Recovery["Retry and Wait for Timeout"]
+Recovery --> Reprocess["Another Node Dequeues X"]
+Reprocess --> Start
+classDef decision fill:#ff9,stroke:#333,stroke-width:2px
+classDef state    fill:#f88,stroke:#333,stroke-width:2px
+
+class Check decision
+class Start state
+```
 
 ---
 
