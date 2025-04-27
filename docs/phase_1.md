@@ -1,0 +1,234 @@
+<img title="" src="https://iconape.com/wp-content/files/fd/372393/svg/372393.svg" alt="ASU" width="339" data-align="center">
+
+<p align="center"><strong><h5 style="text-align: center; font-size: large;">Ain Shams University Faculty of Engineering</h5></strong></p>
+<p align="center"><strong><h5 style="text-align: center; font-size: large;">Computer Engineering and Software Systems</h5></strong></p>
+<p align="center"><strong><h5 style="text-align: center; font-size: large;">Credit Hours Engineering Programs (iCHEP)</h5></strong></p>
+
+<div align="center"> Course Name: <strong>Distributed Computing</strong> </div>
+<div align="center"> Course Code: <strong>CSE354</strong> </div>
+<div align="center"> Academic Year: <strong>Spring 2024</strong></div>
+
+| Student Name                    | ID(ASU)     |
+| ------------------------------- |:-----------:|
+| **Omar Osama**                  | **2101757** |
+| **Ahmad Salah**                 | **210xxxx** |
+| **Ahmad Muhammad Abdelmaksoud** | **2101077** |
+| **Belal Anas Seddik Awad**      | **21P0072** |
+
+# Project: Distributed Web Crawling and Indexing System using Cloud Computing
+
+**Submitted to:**
+
+    **Dr. Ayman Bahaa**
+
+    **Eng. A'laa and Ashraf**
+
+<div style="page-break-before:always;"></div>
+
+# Phase 1: Project Inception and Core Architecture
+
+## Focus
+
+- Establish project foundations
+- Define and document core architecture
+- Set up initial cloud infrastructure
+- Plan tasks and timeline for the full development cycle
+
+---
+
+# Table of Contents
+
+- [Roles](#roles)
+- [Tech Stack Justification](#tech-stack-justification)
+- [System Design](#system-design)
+  - [Architecture Diagrams](#architecture-diagrams)
+  - [Data Flow](#data-flow)
+  - [API/Interface](#apiex-interface)
+  - [Storage Schemas](#storage-schemas)
+  - [Class Diagram](#class-diagram)
+  - [Fault Tolerance](#fault-tolerance)
+  - [Crawler Node Failover Logic](#crawler-node-failover-logic)
+- [Detailed Project Planning](#detailed-project-planning)
+- [Cloud Environment Setup (Basic)](#cloud-environment-setup-basic)
+  - [Set Up Accounts with the Chosen Cloud Provider](#set-up-accounts-with-the-chosen-cloud-provider)
+  - [Configure Basic Cloud Resources](#configure-basic-cloud-resources)
+  - [Establish Basic Network Configurations](#establish-basic-network-configurations)
+- [Initial Code Repository Setup](#initial-code-repository-setup)
+
+<div style="page-break-before:always;"></div>
+
+### 1. Roles
+
+- Cloud and Testing: Omar Osama
+- Crawler: Ahmed Ab
+- Indexer: Ahmed Salah 
+- Architect: Belal Anas
+
+---
+
+### 2. Tech Stack Justification:
+
+- **Scrapy:** Integrated async engine, scheduling, middleware, and politeness protocols enable efficient, large-scale crawling beyond basic libraries.
+
+- **Elasticsearch:** Provides distributed, real-time indexing and scalable search/aggregation features, advantageous over embedded libraries or managing Solr.
+
+- **Celery (with Redis):** Python-native distributed task framework using Redis for high-throughput/low-latency brokering, enabling finer application control than cloud queues.
+
+- **AWS:** Offers a broad, mature, and integrated suite of managed infrastructure components (compute, storage, DBs, queues, ES) ensuring readily available, robust building blocks.
+
+- **AWS RDS:** Delivers managed relational persistence with ACID guarantees, ensuring transactional integrity for critical state/metadata tracking over NoSQL alternatives.
+
+---
+
+<div style="page-break-before:always;"></div>
+
+### 3. System Design
+
+- **Architecture Diagrams**:
+  
+  ![](A:\OneDrive\.ENG\.SP25\3.%20Distributed_System\proj\git\assests\sysArch.png)
+
+<div style="page-break-before:always;"></div>
+
+- **Data Flow**:
+  
+  ![](A:\OneDrive\.ENG\.SP25\3.%20Distributed_System\proj\git\assests\DataFlow.png)
+
+- **API/Interface**
+
+<div style="page-break-before:always;"></div>
+
+- **Storage Schemas**
+  
+  ![](A:\OneDrive\.ENG\.SP25\3.%20Distributed_System\proj\git\assests\DB.png)
+
+- **Class Diagram**
+
+<div style="page-break-before:always;"></div>
+
+- **Fault Tolerance**
+  
+  ![](A:\OneDrive\.ENG\.SP25\3.%20Distributed_System\proj\git\assests\RiskMatrix.jpg)
+  
+  * **Parse Error:** A single webpage's structure causes a parser instance to fail; recovery is typically automatic with minimal impact.
+  * **Indexer Loss:** An indexer node fails losing in-progress index updates before they are stored; requires reprocessing from the queue.
+  * **Master Failure:** Complete failure of the central Master Node, halting crawl coordination, scheduling, and monitoring.
+  * **Config Error:** Incorrect configuration of a parameter, potentially causing suboptimal performance but not failure.
+  * **Crawler Failure:** An individual crawler node crashes or becomes unresponsive, stalling its current tasks until retried via the queue.
+  * **Bad Deploy:** Deployment of software with a critical bug, potentially causing widespread data corruption or operational failure.
+  * **Site Error:** Target website is temporarily unavailable or returns errors (e.g., 503 Service Unavailable); handled via standard crawler retry mechanisms.
+  * **Throttling:** Sustained network throttling or rate-limiting imposed by target websites due to overly aggressive crawling.
+  * **Limit Reached:** Exceeding the capacity of a core resource (storage, database, queue), potentially leading to system-wide failure.
+  
+  <div style="page-break-before:always;"></div>
+
+- **Crawler Node Failover logic:**
+
+```mermaid
+flowchart TD
+Start(["Start"]) --> Check{"Heartbeat?"}
+Check -- No --> Fail["Fail N"]
+Healthy --> Start
+Check -- Yes --> Healthy["N Healthy"]
+Fail --> Log["Log Fail"]
+Log --> Recovery["Retry & Timeout"]
+Recovery --> Reprocess["Dequeue X"]
+Reprocess --> Start
+classDef decision fill:#ff9,stroke:#333,stroke-width:2px
+classDef state    fill:#f88,stroke:#333,stroke-width:2px
+
+class Check decision
+class Start state
+```
+
+<div style="page-break-before:always;"></div>
+
+---
+
+### 4. Detailed Project Planning
+
+- phases into sub-tasks (jira issues)
+- tasks to team members
+- Gantt chart:
+  - Task durations
+  - Dependencies
+  - Milestones for each phase
+
+---
+
+### 5. Cloud Environment Setup (Basic)
+
+#### 5.1. Set Up Accounts with the Chosen Cloud Provider
+
+The cloud environment for this project was set up using **Amazon Web Services (AWS)**. To begin, an AWS account was created, enabling access to various cloud resources, including virtual machines (EC2), storage (S3), and messaging services (SQS).
+
+- **AWS Account**: Created through the AWS Console, providing access to various services necessary for the project.
+
+#### 5.2. Configure Basic Cloud Resources
+
+##### a) Virtual Machines (EC2 Instances)
+
+Three Amazon EC2 instances were created to serve as the **Master Node**, **Crawler Node**, and **Indexer Node**:
+
+- **Master Node**: 
+  - EC2 instance responsible for managing the entire web crawling process. It coordinates the crawling tasks and sends them to the Crawler Node using **SQS**.
+- **Crawler Node**:
+  - EC2 instance responsible for fetching web pages based on URLs provided by the Master Node. It stores the crawled HTML content in **S3**.
+- **Indexer Node**:
+  - EC2 instance responsible for processing the crawled HTML content, extracting relevant data, and creating a search index, which is then stored in **S3**.
+
+##### b) Storage Service (S3)
+
+**S3 (Simple Storage Service)** was used for persistent storage. Two primary buckets were created:
+
+1. **raw/**:
+   - Stores the raw HTML content crawled from websites by the Crawler Node.
+2. **index/**:
+   - Stores the index files (`index.json`) generated by the Indexer Node.
+
+##### c) Task Queue Service (SQS)
+
+Amazon **SQS (Simple Queue Service)** was used to manage task distribution between the Master Node and Crawler Node:
+
+- The Master Node sends **URLs to be crawled** to the SQS queue.
+- The Crawler Node continuously polls the queue, processes the URLs, and returns the crawled data back to S3.
+
+#### 5.3. Establish Basic Network Configurations
+
+To ensure smooth communication between the VMs and AWS services:
+
+##### a) Security Groups
+
+- **Security Groups** were configured to allow traffic between the EC2 instances, ensuring they could communicate with each other securely. Specific inbound rules were set for:
+  - **SSH access** (port 22) from trusted IP addresses (for administrative access).
+  - **Internal traffic** between EC2 instances (e.g., for HTTP communication between nodes or custom ports for your application).
+
+##### b) IAM Roles
+
+- **IAM Roles** were assigned to each EC2 instance to provide them with necessary permissions to interact with **S3** (for storage), **SQS** (for task management), and other AWS services securely.
+
+##### c) Instance Metadata Service (IMDS)
+
+- **IMDS** was enabled to allow EC2 instances to automatically fetch credentials when interacting with AWS services, making it easier to manage access permissions without manually handling API keys.
+
+---
+
+### 6. Initial Code Repository Setup
+
+```shell
+├── requirements.txt     # Python dependencies
+├── config/              # Configuration files
+│   └── settings.yaml    
+├── src/                 # Main source code
+│   ├── crawler/         
+│   ├── indexer/         
+│   ├── master/          
+│   ├── common/          # Shared code (utils, data models)
+│   └── main.py          # Entry point
+├── tests/               # Unit and Integration tests
+│   ├── test_x.py 
+├── scripts/             # Helper scripts (deployment, setup, etc.)
+│   └── start_x.py   
+└── docs/                # Project documentation
+    └── architecture.md  # Detailed architecture description
+```
