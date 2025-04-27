@@ -190,10 +190,12 @@ AWS RDS was selected for managing critical state tracking and metadata storage.
 - **Data Flow**:
   
   ![](./assests/DataFlow.png)
-  
+
 ---
+
 - **API/Interface:**
-### 1. Client ↔ Master API
+  
+  ### 1. Client ↔ Master API
 
 ### 1.1 Start Crawl
 
@@ -458,8 +460,6 @@ GET /api/v1/search
   | 400       | Missing or empty `q`  | `{ "error":"BadRequest","message":"Query parameter q is required" }` |
   | 500       | Query service failure | `{ "error":"InternalError","message":"Search index unavailable" }`   |
 
-
-
 - **JSON:**
   ![](./assests/json.png)
 
@@ -470,56 +470,93 @@ GET /api/v1/search
   ![](./assests/DB.png)
 
 - **Class Diagram**
+
 ```mermaid
 classDiagram
-    class MasterNode {
-        -comm: MPI.COMM_WORLD
-        -rank: int
-        -size: int
-        -status: MPI.Status
-        -crawler_nodes: int
-        -indexer_nodes: int
-        -active_nodes: Set[int]
-        -node_health: Dict[int, float]
-        -heartbeat_timeout: int
-        -urls_to_crawl: Set[str]
-        -processing_urls: Set[str]
-        -completed_urls: Set[str]
-        -task_results: Dict[str, AsyncResult]
-        -batch_size: int
-        -crawler_queue: str
-        -indexer_queue: str
-        -metrics: Dict[str, Any]
-        -seed_urls: List[str]
-        +initialize() bool
-        +log_system_state()
-        +create_url_batch() List[str]
-        +assign_tasks_to_crawlers(batch: List[str])
-        +monitor_node_health()
-        +handle_node_failure(node_id: int)
-        +process_task_results()
-        +run()
-    }
+  class MasterNode {
+      -comm: MPI.COMM_WORLD
+      -rank: int
+      -size: int
+      -status: MPI.Status
+      -crawler_nodes: int
+      -indexer_nodes: int
+      -active_nodes: Set[int]
+      -node_health: Dict[int, float]
+      -heartbeat_timeout: int
+      -urls_to_crawl: Set[str]
+      -processing_urls: Set[str]
+      -completed_urls: Set[str]
+      -task_results: Dict[str, AsyncResult]
+      -batch_size: int
+      -crawler_queue: str
+      -indexer_queue: str
+      -metrics: Dict[str, Any]
+      -seed_urls: List[str]
+      +initialize() bool
+      +log_system_state()
+      +create_url_batch() List[str]
+      +assign_tasks_to_crawlers(batch: List[str])
+      +monitor_node_health()
+      +handle_node_failure(node_id: int)
+      +process_task_results()
+      +run()
+  }
 
-    class MPI {
-        +COMM_WORLD
-        +Status
-    }
+  class MPI {
+      +COMM_WORLD
+      +Status
+  }
 
-    class AsyncResult {
-        +ready()
-        +get()
-        +worker_pid
-        +args
-    }
+  class AsyncResult {
+      +ready()
+      +get()
+      +worker_pid
+      +args
+  }
 
-    class Celery {
-        +apply_async()
-    }
+  class Celery {
+      +apply_async()
+  }
 
-    MasterNode --> MPI : uses
-    MasterNode --> AsyncResult : manages
-    MasterNode --> Celery : uses
+  MasterNode --> MPI : uses
+  MasterNode --> AsyncResult : manages
+  MasterNode --> Celery : uses
+```
+
+```mermaid
+classDiagram
+
+class CrawleriSpider {
+  +start_urls : list
+  +parse(response)
+}
+
+class SnipdexItem {
+  +url
+  +title
+  +description
+  +keywords
+  +text
+  +links
+  +timestamp
+  +content_type
+  +language
+}
+
+class ItemLoader {
+  +add_xpath(field, xpath)
+  +add_value(field, response.url)
+  +input_processors
+  +output_processors
+}
+
+class clean_whitespace_in {
+  <<input processor>>
+}
+
+CrawleriSpider --> ItemLoader : uses
+ItemLoader --> SnipdexItem : loads data into
+ItemLoader --> clean_whitespace_in : uses for preprocessing
 ```
 
 <div style="page-break-before:always;"></div>
