@@ -205,25 +205,108 @@
 
 ### 1.3. Indexer Node
 
-* 
+* **Purpose:** Processes and indexes crawled content from crawler nodes, making it searchable through Elasticsearch
 
 * **Data Reception:** 
+  - Receives crawled content from crawler nodes via direct communication
+  - Content includes webpage text and metadata (URL, timestamp, etc.)
+  - Uses MPI for communication with other nodes
 
 * **Indexing Logic:** 
+  - Processes received content and sends it to Elasticsearch cluster
+  - Uses Elasticsearch's distributed indexing capabilities
+  - Maintains document structure with content and metadata fields
 
 * **Content Processing:** 
+  - Extracts main content from HTML
+  - Cleans and normalizes text
+  - Extracts metadata (URL, timestamp, etc.)
+  - Structures data for Elasticsearch indexing
 
 * **Index Storage:** 
+  - Uses Elasticsearch cluster for distributed storage
+  - Documents stored with unique IDs (URLs)
+  - Maintains both content and metadata fields
+  - Supports full-text search capabilities
 
 * **Search Functionality:** 
+  - Implements basic keyword search
+  - Supports fuzzy matching for typo tolerance
+  - Returns relevant documents with metadata
+  - Basic relevance scoring
 
 * **Libraries Used:** 
+  - `elasticsearch`: For connecting to and interacting with Elasticsearch cluster
+  - `mpi4py`: For communication with other nodes
+  - `logging`: For monitoring and debugging
 
 * **Code Snippet:**
-  
   ```python
-  ###code
+  from elasticsearch import Elasticsearch
+  from mpi4py import MPI
+  import logging
+
+  # Configure logging
+  logging.basicConfig(level=logging.INFO, format='%(asctime)s - Indexer - %(levelname)s - %(message)s')
+
+  # Connect to Elasticsearch cluster
+  es = Elasticsearch([
+      "http://instance1-ip:9200",
+      "http://instance2-ip:9200"
+  ])
+
+  def indexer_process():
+      comm = MPI.COMM_WORLD
+      rank = comm.Get_rank()
+      size = comm.Get_size()
+      logging.info(f"Indexer node started with rank {rank} of {size}")
+
+      while True:
+          status = MPI.Status()
+          content_to_index = comm.recv(source=MPI.ANY_SOURCE, tag=2, status=status)
+          source_rank = status.Get_source()
+
+          if not content_to_index:
+              logging.info(f"Indexer {rank} received shutdown signal. Exiting.")
+              break
+
+          try:
+              # Process and index the content
+              doc_id = content_to_index["meta_data"]["url"]
+              resp = es.index(
+                  index="crawler_index",
+                  id=doc_id,
+                  document=content_to_index,
+                  refresh=True
+              )
+              logging.info(f"Indexed document with ID: {resp['_id']}")
+
+              # Send status update to master
+              comm.send(
+                  f"Indexer {rank} - Indexed content from Crawler {source_rank}",
+                  dest=0,
+                  tag=99
+              )
+
+          except Exception as e:
+              logging.error(f"Indexer {rank} error indexing content: {e}")
+              comm.send(
+                  f"Indexer {rank} - Error indexing: {e}",
+                  dest=0,
+                  tag=999
+              )
+
+  if __name__ == '__main__':
+      indexer_process()
   ```
+
+This implementation:
+1. Connects to the Elasticsearch cluster
+2. Receives content from crawler nodes
+3. Processes and indexes the content
+4. Provides basic search functionality
+5. Includes error handling and logging
+6. Reports status back to the master node
 
 ### 1.4. Task Queues
 
