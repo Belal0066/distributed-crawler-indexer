@@ -26,10 +26,11 @@ The system employs a distributed, microservices-oriented architecture leveraging
   ![](./assests/sysArch.png)
 
 *Diagram Description:* This diagram illustrates the high-level static structure organized into logical layers:
-    -  **Clients (UI Layer):** User-facing interfaces (Web, CLI) for initiating and monitoering crawls, and submitting search queries.
-    -  **Processing Layer:** Contains the core logic, including the central Master Node orchestrator and pools of scalable Crawler and Indexer nodes. Includes the external Websites being crawled.
-    -  **Cloud Storage Layer:** Persistent storage for Seed URLs, raw crawled HTML (optional archival), and the built Search Index, utilizing cloud-based storage solutions.
-    -  Arrows indicate primary control and data flow directions between components and layers.
+- **Clients (UI Layer):** User-facing interfaces (Web, CLI) for initiating and monitoring crawls, and submitting search queries.
+- **Processing Layer:** Contains the core logic, including the central Master Node orchestrator and pools of scalable Crawler and Indexer nodes. Includes the external Websites being crawled.
+- **Cloud Storage Layer:** Persistent storage for Seed URLs, raw crawled HTML (optional archival), and the built Search Index, utilizing cloud-based storage solutions.
+- Arrows indicate primary control and data flow directions between components and layers.
+
 
 ### 2.2 Component Descriptions
 
@@ -84,16 +85,16 @@ The system employs a distributed, microservices-oriented architecture leveraging
 ![](./assests/DataFlow.png)
 
 *Diagram Description:* This diagram illustrates the primary dynamic flow of data through the system:
-    1.  **Initiation:** User submits Seed URLs/Params via the Client to the Seed Loader/Master. Seeds are stored.
-    2.  **Scheduling:** Master creates crawl tasks and enqueues URLs onto the Task Queue.
-    3.  **Crawling:** Crawler dequeues a task, applies politeness rules, requests the URL from Websites, and receives Raw HTML.
-    4.  **Parsing:** Crawler (or dedicated Parser component) parses Raw HTML, extracts links/text. Raw HTML may be stored in Raw Storage. Extracted links are reported back to the Master (Status) for potential scheduling.
-    5.  **Indexing Queue:** Processed page data is enqueued onto the Ingest Queue.
-    6.  **Indexing:** Indexer dequeues processed data, builds index entries, and writes them to the Index Store. Status reported to Master.
-    7.  **Monitoring:** User monitors progress via Client, querying the Master Node.
-    8.  **Querying:** User submits a query via Client to the Query Engine/Service.
-    9.  **Lookup:** Query Engine looks up terms in the Index Store.
-    10. **Ranking & Results:** Query Engine receives index data, ranks results, and returns Ranked Links/Results to the User via the Client.
+1. **Initiation:** User submits Seed URLs/Params via the Client to the Seed Loader/Master. Seeds are stored.
+2. **Scheduling:** Master creates crawl tasks and enqueues URLs onto the Task Queue.
+3. **Crawling:** Crawler dequeues a task, applies politeness rules, requests the URL from Websites, and receives Raw HTML.
+4. **Parsing:** Crawler (or dedicated Parser component) parses Raw HTML, extracts links/text. Raw HTML may be stored in Raw Storage. Extracted links are reported back to the Master (Status) for potential scheduling.
+5. **Indexing Queue:** Processed page data is enqueued onto the Ingest Queue.
+6. **Indexing:** Indexer dequeues processed data, builds index entries, and writes them to the Index Store. Status reported to Master.
+7. **Monitoring:** User monitors progress via Client, querying the Master Node.
+8. **Querying:** User submits a query via Client to the Query Engine/Service.
+9. **Lookup:** Query Engine looks up terms in the Index Store.
+10. **Ranking & Results:** Query Engine receives index data, ranks results, and returns Ranked Links/Results to the User via the Client.
 
 ## 3. API Interface Design
 
@@ -145,22 +146,21 @@ Well-defined API interfaces are critical even for internal communication. This s
 
 ## 4. Fault Tolerance & Reliability
 
-Designing for failure is critical in a distributed system.
-
 ### 4.1 Risk Assessment Matrix
 
 ![](./assests/RiskMatrix.jpg)
 
 *Diagram Description:* This matrix identifies potential risks based on their likelihood (Rare, Moderate, Very Likely) and impact (Minor, Major, Extreme) *before* mitigation. Key risks include:
-    *   **Parse Error (Rare, Minor):** Isolated parser failure on malformed HTML.
-    *   **Indexer Loss (Rare, Major):** Indexer node failure losing in-memory state.
-    *   **Master Failure (Rare, Extreme):** Complete failure of the central orchestrator.
-    *   **Config Error (Moderate, Minor):** Incorrect non-critical parameter settings.
-    *   **Crawler Failure (Moderate, Major):** Individual crawler node crash/unresponsiveness.
-    *   **Bad Deploy (Moderate, Extreme):** Critical software bug deployment.
-    *   **Site Error (Very Likely, Minor):** Target website temporary unavailability.
-    *   **Throttling (Very Likely, Major):** Exceeding website crawl limits causing blocking.
-    *   **Limit Reached (Very Likely, Extreme):** Exceeding capacity of a core resource.
+
+- **Parse Error (Rare, Minor):** Isolated parser failure on malformed HTML.
+- **Indexer Loss (Rare, Major):** Indexer node failure losing in-memory state.
+- **Master Failure (Rare, Extreme):** Complete failure of the central orchestrator.
+- **Config Error (Moderate, Minor):** Incorrect non-critical parameter settings.
+- **Crawler Failure (Moderate, Major):** Individual crawler node crash/unresponsiveness.
+- **Bad Deploy (Moderate, Extreme):** Critical software bug deployment.
+- **Site Error (Very Likely, Minor):** Target website temporary unavailability.
+- **Throttling (Very Likely, Major):** Exceeding website crawl limits causing blocking.
+- **Limit Reached (Very Likely, Extreme):** Exceeding capacity of a core resource.
 
 ### 4.2 Initial Fault Tolerance Plan: Crawler Node Failure
 
@@ -195,4 +195,3 @@ This section details the strategy for handling the failure of an individual Craw
     * (Optional) Triggers auto-scaling mechanisms to provision a replacement node.
 * **Impact Reduction:** This strategy reduces the impact of a single Crawler failure from **Major** (stalled tasks, reduced throughput requiring manual intervention) to **Minor** (slight delay for specific tasks, temporary throughput dip until replacement). Task data (the URL to be crawled) is not lost due to queue persistence.
 
-*(Further fault tolerance plans will address Indexer Node failure, Master Node high availability, Index Store replication/backup, and Queue service reliability).*
