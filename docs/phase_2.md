@@ -111,8 +111,65 @@
 ## 3. Testing and Results
 
 * **Unit Testing:** 
-* **Integration Testing:** 
-* **Results:** 
-* **Bugs/Issues Encountered:** 
+  
+  - Master Node:
+    
+    
+  
+  - Crawler Node/s:
+    
+    
+  
+  - Indexer Node/s:
+    
+    
 
----
+* **Integration Testing:** 
+  
+  ```sh
+  ❯ ./run_system_test.sh
+  Starting Redis server...
+  Starting Celery workers...
+  Crawler worker started
+  Indexer worker started
+  Monitoring worker started
+  Starting master node with MPI...
+  2025-04-27 22:26:09,690 - __main__ - INFO - Active Crawler Nodes: [1, 2]
+  2025-04-27 22:26:09,690 - __main__ - INFO - Active Indexer Nodes: [3]
+  2025-04-27 22:26:09,690 - __main__ - INFO - Active Crawler Nodes: [1, 2]
+  2025-04-27 22:26:09,690 - __main__ - INFO - Active Indexer Nodes: [3]
+  2025-04-27 22:26:09,690 - __main__ - INFO - Active Crawler Nodes: [1, 2]
+  2025-04-27 22:26:09,690 - __main__ - INFO - Active Indexer Nodes: [3]
+  2025-04-27 22:26:09,690 - __main__ - INFO - Active Crawler Nodes: [1, 2]
+  2025-04-27 22:26:09,690 - __main__ - INFO - Active Indexer Nodes: [3]
+  2025-04-27 22:26:09,690 - __main__ - INFO - 
+  ```
+
+* **Results:** 
+  - Start
+  ```sh
+  System State:
+      Runtime: 0.00 seconds
+      Active Nodes: 3/4
+      URLs to Crawl: 2
+      Processing URLs: 0
+      Completed URLs: 0
+      Tasks Created: 0
+      Tasks Completed: 0
+      Tasks Failed: 0
+      Node Failures: 0
+  ```
+  - End
+  ```sh
+  System State:
+    Runtime: 1.06 seconds
+    Active Nodes: 3/4
+    URLs to Crawl: 0
+    Processing URLs: 0
+    Completed URLs: 2
+    Tasks Created: 2
+    Tasks Completed: 2
+    Tasks Failed: 0
+    Node Failures: 0
+  ```
+
