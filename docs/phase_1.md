@@ -60,112 +60,128 @@
 ### 1. Roles
 
 - Cloud and Testing: Omar Osama
-- Crawler: Ahmed Ab
+- Crawler: Ahmed Muhammad 
 - Indexer: Ahmed Mohamed Salah 
 - Architect: Belal Anas
 
 ---
 
-### 2. Tech Stack Justification:
+##### 2. Tech Stack Justification
 
-- **Scrapy:** Integrated async engine, scheduling, middleware, and politeness protocols enable efficient, large-scale crawling beyond basic libraries.
+The technology stack was carefully selected to ensure scalability, fault tolerance, cloud compatibility, and efficient content crawling and indexing.  
+Each tool was chosen based on its strengths in distributed system design, data processing, and cloud deployment.
 
-- **Elasticsearch:** Elasticsearch's node-based architecture is particularly well-suited for our distributed web crawling system, as it has these following properties:
+---
 
-  1. ***Distributed Architecture & Scalability***
-    - Elasticsearch operates as a cluster of nodes (Elasticsearch instances)
-    - Each node is a running instance of Elasticsearch that can:
-      - Store data
-      - Process search requests
-      - Handle indexing operations
-    - Nodes can be added or removed from the cluster dynamically
-    - This distributed nature perfectly matches our project's need for scalable indexing
-  
-  2. ***Fault Tolerance Through Replication***
-    - Elasticsearch uses a sharding system where:
-      - Data is divided into shards (pieces)
-      - Each shard has a primary copy and replica copies
-      - Replicas are stored on different nodes
-    - If an Elasticsearch node fails:
-      - The primary shards on that node become unavailable
-      - Replica shards on other nodes are automatically promoted to primary status
-      - This ensures data remains accessible even during node failures
-    - This built-in replication system helps us meet our project's fault tolerance requirements
-  
-  3. ***Advanced Search Capabilities***
-    - Each Elasticsearch node can process search queries
-    - Built-in support for:
-      - Full-text search
-      - Boolean queries
-      - Phrase matching
-      - Relevance scoring
-    - This provides the robust search functionality required by our project
-  
-  4. ***Performance & Resource Management***
-    - Each Elasticsearch node can:
-      - Cache frequently accessed data
-      - Process queries in parallel
-      - Handle multiple indexing operations simultaneously
-    - This ensures efficient processing of our crawled content
-  
-  5. ***Integration & Communication***
-    - Elasticsearch nodes communicate through a REST API
-    - Python client (elasticsearch-py) provides easy integration
-    - Simple to connect our crawler nodes to the Elasticsearch cluster
-    - Nodes can be added or removed without application changes
-  
-  6. ***Cloud Deployment***
-    - Elasticsearch nodes can run on cloud VMs (like AWS EC2)
-    - Each VM can host one or more Elasticsearch nodes
-    - Example architecture:
-      ```
-      AWS EC2 Instance 1
-      └── Elasticsearch Node 1 (Primary Shards)
-      └── Elasticsearch Node 2 (Replica Shards)
-    
-      AWS EC2 Instance 2
-      └── Elasticsearch Node 3 (Primary Shards)
-      └── Elasticsearch Node 4 (Replica Shards)
-      ```
-    - This makes it easy to deploy in our cloud environment
-  
-  7. ***Monitoring & Health Checks***
-    - Each Elasticsearch node reports its status
-    - Built-in monitoring for:
-      - Node health
-      - Shard allocation
-      - Indexing performance
-      - Search performance
-    - Helps us track system health and performance
+#### - **Scrapy (Crawler Framework with Extraction and Preprocessing)**
 
-- **Celery (with Redis):** 
-  
-  - **Deep Python Integration:** Celery is a Python-native framework, enabling seamless integration with the existing Python codebase (Scrapy, application logic) and leveraging Python's concurrency models (`asyncio`, threading, multiprocessing) effectively.
-  - **Low-Latency Brokering:** Redis, as an in-memory data store, provides extremely fast message enqueue/dequeue operations, minimizing task scheduling overhead crucial for high-throughput crawling and indexing workloads.
-  - **Rich Task Execution Control:** Celery offers application-level features beyond basic queuing (provided by cloud services like SQS/PubSub), including built-in support for task retries with backoff, rate limiting (essential for politeness), scheduled tasks (Celery Beat), and defining complex task workflows (chains, groups, chords).
-  - **Flexible Result Backends:** While using Redis as a broker, Celery allows storing task results or state in various backends (including Redis itself, databases, or disabling it entirely), offering flexibility based on whether task return values are needed.
-  - **Broker Decoupling:** Although chosen with Redis initially, Celery's architecture allows swapping the broker (e.g., to RabbitMQ or SQS) later with relatively minimal application code changes if requirements evolve.
+Scrapy was selected as the primary framework for crawling web content and preparing extracted data for indexing.
 
-- **AWS:** Offers a broad, mature, and integrated suite of managed infrastructure components (compute, storage, DBs, queues, ES) ensuring readily available, robust building blocks.
+- **Asynchronous Architecture:** Supports large-scale concurrent crawling efficiently.
 
-- **AWS RDS:** Delivers managed relational persistence with ACID guarantees, ensuring transactional integrity for critical state/metadata tracking over NoSQL alternatives.
+- **XPath Extraction via Item Loaders:** Enables precise targeting of relevant user-interest text such as headings, paragraphs, and sections.
+
+- **Integrated Preprocessing Pipeline:** Includes text cleaning, whitespace normalization, and fallback handling within the Item Loader system.
+
+- **Built-in Retry and Politeness Control:** Handles retries, timeouts, and respects `robots.txt` directives natively.
+
+- **Cloud and Task Queue Readiness:** Modular structure supports future integration with AWS and task distribution frameworks.
+
+---
+
+#### - **Readability-lxml (Optional Content Extraction Enhancement)**
+
+An optional module used in an experimental crawler node to improve robustness for unstructured web pages.
+
+- **Content-Density Analysis:** Isolates main article content automatically.
+
+- **Flexibility:** Allows handling of blog posts, news articles, and long-form content without manual targeting.
+
+---
+
+#### - **Elasticsearch (Distributed Indexing and Search Engine)**
+
+Elasticsearch was selected as the core engine for indexing and querying crawled content due to its distributed nature and rich query capabilities.
+
+- **Distributed Architecture:** Nodes store shards and handle parallel indexing/search operations.
+
+- **Fault Tolerance through Shard Replication:** Ensures high availability during node failures.
+
+- **Advanced Search Capabilities:** Full-text search, boolean queries, phrase matching, relevance scoring.
+
+- **Resource Efficiency:** Supports query caching, parallel processing, and efficient memory use.
+
+- **RESTful API and Python Client Integration:** Easy communication with crawler and indexer nodes.
+
+- **Cloud Deployment Flexibility:** Easily runs on AWS EC2 instances with elastic scaling.
+
+- **Monitoring and Health Checks:** Built-in support for tracking cluster status and performance.
+
+---
+
+#### - **Celery with Redis (Task Queue and Asynchronous Coordination)**
+
+Celery combined with Redis was chosen for distributed task management between system components.
+
+- **Deep Python Integration:** Native Python concurrency support (threading, multiprocessing, asyncio).
+
+- **Low-Latency Messaging:** Redis offers fast, in-memory message brokering for task dispatch.
+
+- **Rich Task Control:** Built-in retries, rate limiting, scheduling (Celery Beat), and task chaining.
+
+- **Flexible Result Handling:** Optional task result backends for success/failure tracking.
+
+- **Broker Independence:** Can switch brokers easily (RabbitMQ, SQS) if future scaling requires.
+
+---
+
+#### - **AWS (Cloud Infrastructure)**
+
+Amazon Web Services was selected to host the distributed components due to its robust, mature infrastructure.
+
+- **Managed Compute Resources (EC2):** Scalable virtual machines to run crawler and indexer nodes.
+
+- **Elastic Storage (S3):** Reliable storage of crawled data and backups.
+
+- **Scalable Databases (RDS, OpenSearch):** Flexible relational and search database services.
+
+- **Integrated Monitoring and IAM Security:** Built-in service monitoring, alarms, and fine-grained access control.
+
+---
+
+#### - **AWS RDS (Managed Relational Database Service)**
+
+AWS RDS was selected for managing critical state tracking and metadata storage.
+
+- **Transactional Integrity (ACID):** Ensures reliability and consistency of system-critical metadata.
+
+- **Automatic Backups and Scaling:** Enables fault tolerance and vertical scaling without downtime.
+
+- **Simplified Management:** Reduces administrative overhead for database maintenance.
 
 ---
 
 <div style="page-break-before:always;"></div>
 
 ### 3. System Design
+
   The distributed web crawling and indexing system is designed with a focus on scalability, fault tolerance, and efficient data processing. The system architecture follows a master-worker pattern, where a central master node coordinates multiple crawler and indexer nodes. This design allows for parallel processing of web pages and distributed indexing, enabling the system to handle large-scale web crawling tasks efficiently.
-  
+
   The system's components are distributed across cloud-based virtual machines, with each component having specific responsibilities:
-  - The master node manages task distribution and monitors worker health
-  - Crawler nodes handle web page fetching and content extraction
-  - Indexer nodes process and store the crawled content in a searchable format
-  - A distributed task queue ensures reliable communication between components
-  - Cloud storage provides persistent data storage for crawled content and indexes
+
+- The master node manages task distribution and monitors worker health
+
+- Crawler nodes handle web page fetching and content extraction
+
+- Indexer nodes process and store the crawled content in a searchable format
+
+- A distributed task queue ensures reliable communication between components
+
+- Cloud storage provides persistent data storage for crawled content and indexes
   
   This architecture enables the system to scale horizontally by adding more worker nodes as needed, while maintaining fault tolerance through replication and task redistribution mechanisms.
-- **Architecture Diagrams**:
+  
+  - **Architecture Diagrams**:
   
   ![](./assests/sysArch.png)
 
@@ -231,12 +247,50 @@ class Start state
 
 ### 4. Detailed Project Planning
 
-- phases into sub-tasks (jira issues)
-- tasks to team members
-- Gantt chart:
-  - Task durations
-  - Dependencies
-  - Milestones for each phase
+The project planning was managed using **Jira** to ensure structured task tracking, proper role assignments, and timeline visualization.  
+
+The work was broken down into manageable tasks for each phase, aligned with a Gantt-style roadmap spanning 8 weeks.
+
+---
+
+### Task Breakdown
+
+#### Phase 1 – Project Inception
+
+| Task                           | Assigned To  | Timeline    |
+| ------------------------------ | ------------ | ----------- |
+| Extract Requirements           | Team shared  | 10–11 April |
+| Define Team Roles              | Team shared  | 11–12 April |
+| Setup Git Repo                 | Architect    | 13 April    |
+| System Architecture Diagrams   | Architect    | 13–16 April |
+| Design Crawler Architecture    | Crawler Lead | 15–17 April |
+| Finalize Tech Stack            | Architect    | 17–19 April |
+| Write Technology Justification | Team shared  | 18–19 April |
+| Create Gantt Chart             | Team shared  | 13–14 April |
+| Prepare Phase 1 Report         | Team shared  | 13–19 April |
+
+---
+
+### Timeline (Gantt Chart View)
+
+> The project tasks were organized into a timeline using **Jira Roadmaps**, showing parallel development efforts across Phases 1 and 2.  
+> 
+> Tasks were scheduled with clear start and end dates, ensuring each team member's workload was balanced.
+
+**Timeline Screenshot:**
+
+![](./assests/epics.png)
+
+![](./assests/gantt.png)
+
+### Milestones
+
+| Milestone          | Description                                   | Target Date   |
+| ------------------ | --------------------------------------------- | ------------- |
+| Phase 1 Completion | Project inception and tech stack finalized    | 19 April 2025 |
+| Phase 2 Completion | Basic crawling and indexing functional        | 27 April 2025 |
+| Phase 3 Completion | Fault tolerance and cloud storage integration | 2 May 2025    |
+| Phase 4 Completion | Final deployment and documentation            | 9 May 2025    |
 
 ---
 
