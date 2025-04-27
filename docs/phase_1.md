@@ -176,8 +176,278 @@
   ![](./assests/DataFlow.png)
 
 - **API/Interface:**
+## 
 
-- **API/Interface:**
+
+
+## 1. Client ↔ Master API
+
+### 1.1 Start Crawl
+
+**Endpoint:**
+
+```
+POST /api/v1/crawls
+```
+
+- **Purpose:**  
+  Create a new `<Job>`
+
+- **Request Body (JSON):**
+  
+  ```json
+  {
+    "seedUrls": ["http://example.com", "http://example.org"],
+    "parameters": {
+      "crawlDepth": <num>,
+      "domainRestrictions": ["example.com"],
+      "politenessDelayMs": <num>,
+      "userAgent": "MyCrawler/1.0"
+    }
+  }
+  ```
+
+- **Success Response (202 Accepted):**
+  
+  ```json
+  {
+    "id": "<uuid>",
+    "status": "<PENDING|RUNNING>",
+    "meta": { … }
+  }
+  ```
+
+- **Error Responses:**
+  
+  | HTTP Code | Scenario                      | Body Example                                                    |
+  | --------- | ----------------------------- | --------------------------------------------------------------- |
+  | 400       | Invalid or missing parameters | `{ "error":"BadRequest","message":"Missing seedUrls" }`         |
+  | 500       | Master node internal error    | `{ "error":"InternalError","message":"Unable to queue crawl" }` |
+
+---
+
+### 1.2 Monitor Crawl Status
+
+**Endpoint:**
+
+```
+GET /api/v1/crawls/{crawlId}/status
+```
+
+- **Purpose:**  
+  Read status & metrics for `<Job>`
+
+- **Path Parameters:**
+  
+  | Name    | In   | Type   | Required | Description                |
+  | ------- | ---- | ------ | -------- | -------------------------- |
+  | crawlId | path | string | yes      | Unique ID of the crawl job |
+
+- **Success Response (200 OK):**
+  
+  ```json
+  {
+    "id": "<uuid>",
+    "status": "<PENDING|RUNNING|SUCCEEDED|FAILED>",
+    "metrics": { … },
+    "timestamps": { "created": "<ISO>", "updated": "<ISO>" }
+  }
+  ```
+
+- **Error Responses:**
+  
+  | HTTP Code | Scenario                   | Body Example                                                     |
+  | --------- | -------------------------- | ---------------------------------------------------------------- |
+  | 404       | crawlId not found          | `{ "error":"NotFound","message":"Crawl job not found" }`         |
+  | 500       | Master node internal error | `{ "error":"InternalError","message":"Unable to fetch status" }` |
+
+---
+
+## 2. Worker ↔ Master API
+
+### 2.1 Register Worker
+
+**Endpoint:**
+
+```
+POST /api/v1/workers/register
+```
+
+- **Purpose:**  
+  Register or heartbeat worker
+
+- **Request Body (JSON):**
+  
+  ```json
+  {
+    "workerId": "<string>",
+    "type": "<CRAWLER|INDEXER>",
+    "address": "<host:port>",
+    "capabilities": { … }    // optional for heartbeat
+  }
+  ```
+
+- **Success Response (204 No Content):**  
+  *No body.*
+
+- **Error Responses:**
+  
+  | HTTP Code | Scenario                  | Body Example                                                   |
+  | --------- | ------------------------- | -------------------------------------------------------------- |
+  | 400       | Missing or invalid fields | `{ "error":"BadRequest","message":"Missing nodeType" }`        |
+  | 409       | nodeId already registered | `{ "error":"Conflict","message":"Worker already registered" }` |
+
+---
+
+### 2.2 Send Heartbeat
+
+**Endpoint:**
+
+```
+POST /api/v1/workers/{workerId}/heartbeat
+```
+
+- **Purpose:**  
+  Signal to the Master that the worker node is still alive.
+
+- **Path Parameters:**
+  
+  | Name     | In   | Type   | Required | Description                  |
+  | -------- | ---- | ------ | -------- | ---------------------------- |
+  | workerId | path | string | yes      | Unique ID of the worker node |
+
+- **Request Body:**  
+  *(Empty JSON object)*
+  
+  ```json
+  {}
+  ```
+
+- **Success Response (204 No Content):**  
+  *No body.*
+
+- **Error Responses:**
+  
+  | HTTP Code | Scenario                | Body Example                                               |
+  | --------- | ----------------------- | ---------------------------------------------------------- |
+  | 404       | workerId not registered | `{ "error":"NotFound","message":"Worker not registered" }` |
+
+---
+
+### 2.3 Report Status / Update
+
+**Endpoint:**
+
+```
+POST /api/v1/workers/{workerId}/status
+```
+
+- **Purpose:**  
+  Report current status & results
+
+- **Path Parameters:**
+  
+  | Name     | In   | Type   | Required | Description                  |
+  | -------- | ---- | ------ | -------- | ---------------------------- |
+  | workerId | path | string | yes      | Unique ID of the worker node |
+
+- **Request Body (JSON):**
+  
+  - **Crawler example:**
+    
+    ```json
+    {
+      "status": "IDLE",
+      "metrics": {
+        "processedTasks": 150,
+        "avgLatencyMs": 350
+      },
+      "newUrlsDiscovered": [
+        "http://example.com/new-page",
+        "http://othersite.org/"
+      ]
+    }
+    ```
+  
+  - **Indexer example:**
+    
+    ```json
+    {
+      "status": "BUSY",
+      "currentTask": "indexing-doc-xyz",
+      "metrics": {
+        "docsIndexedSinceLast": 10
+      }
+    }
+    ```
+
+- **Success Response (204 No Content):**  
+  *No body.*
+
+- **Error Responses:**
+  
+  | HTTP Code | Scenario               | Body Example                                                |
+  | --------- | ---------------------- | ----------------------------------------------------------- |
+  | 400       | Invalid status payload | `{ "error":"BadRequest","message":"Unknown status value" }` |
+  | 404       | workerId not found     | `{ "error":"NotFound","message":"Worker not registered" }`  |
+
+---
+
+## 3. Client ↔ Query Service API
+
+### 3.1 Submit Search Query
+
+**Endpoint:**
+
+```
+GET /api/v1/search
+```
+
+- **Purpose:**  
+  Execute a search against the built index and return ranked results.
+
+- **Query Parameters:**
+  
+  | Name   | In    | Type   | Required | Default | Description                         |
+  | ------ | ----- | ------ | -------- | ------- | ----------------------------------- |
+  | q      | query | string | yes      | —       | Search query (e.g. `web+crawler`)   |
+  | limit  | query | int    | no       | 10      | Maximum number of results to return |
+  | offset | query | int    | no       | 0       | Pagination offset                   |
+
+- **Success Response (200 OK):**
+  
+  ```json
+  {
+    "query": "web crawler architecture",
+    "results": [
+      {
+        "title": "Building a Distributed Web Crawler",
+        "url": "http://example-blog.com/crawler-design",
+        "snippet": "...key components of a scalable web crawler architecture...",
+        "score": 0.85
+      },
+      {
+        "title": "Web Crawling - Wikipedia",
+        "url": "https://en.wikipedia.org/wiki/Web_crawler",
+        "snippet": "A Web crawler, sometimes called a spider or spiderbot…",
+        "score": 0.72
+      }
+    ],
+    "totalHits": 1250,
+    "queryTimeMs": 45
+  }
+  ```
+
+- **Error Responses:**
+  
+  | HTTP Code | Scenario              | Body Example                                                         |
+  | --------- | --------------------- | -------------------------------------------------------------------- |
+  | 400       | Missing or empty `q`  | `{ "error":"BadRequest","message":"Query parameter q is required" }` |
+  | 500       | Query service failure | `{ "error":"InternalError","message":"Search index unavailable" }`   |
+
+
+
+- **JSON:**
   ![](./assests/json.png)
 
 <div style="page-break-before:always;"></div>
