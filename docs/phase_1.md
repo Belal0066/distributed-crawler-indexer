@@ -138,7 +138,13 @@
       - Search performance
     - Helps us track system health and performance
 
-- **Celery (with Redis):** Python-native distributed task framework using Redis for high-throughput/low-latency brokering, enabling finer application control than cloud queues.
+- **Celery (with Redis):** 
+  
+  - **Deep Python Integration:** Celery is a Python-native framework, enabling seamless integration with the existing Python codebase (Scrapy, application logic) and leveraging Python's concurrency models (`asyncio`, threading, multiprocessing) effectively.
+  - **Low-Latency Brokering:** Redis, as an in-memory data store, provides extremely fast message enqueue/dequeue operations, minimizing task scheduling overhead crucial for high-throughput crawling and indexing workloads.
+  - **Rich Task Execution Control:** Celery offers application-level features beyond basic queuing (provided by cloud services like SQS/PubSub), including built-in support for task retries with backoff, rate limiting (essential for politeness), scheduled tasks (Celery Beat), and defining complex task workflows (chains, groups, chords).
+  - **Flexible Result Backends:** While using Redis as a broker, Celery allows storing task results or state in various backends (including Redis itself, databases, or disabling it entirely), offering flexibility based on whether task return values are needed.
+  - **Broker Decoupling:** Although chosen with Redis initially, Celery's architecture allows swapping the broker (e.g., to RabbitMQ or SQS) later with relatively minimal application code changes if requirements evolve.
 
 - **AWS:** Offers a broad, mature, and integrated suite of managed infrastructure components (compute, storage, DBs, queues, ES) ensuring readily available, robust building blocks.
 
@@ -169,7 +175,10 @@
   
   ![](./assests/DataFlow.png)
 
-- **API/Interface**
+- **API/Interface:**
+
+- **API/Interface:**
+  ![](./assests/json.png)
 
 <div style="page-break-before:always;"></div>
 
