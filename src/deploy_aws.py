@@ -19,9 +19,9 @@ from src.common.aws_config import (
 )
 
 # Default EC2 configuration
-DEFAULT_AMI = 'ami-0cf10cdf9fcd62d37'  # Ubuntu 22.04 for eu-north-1
+DEFAULT_AMI = 'ami-0989fb15ce71ba39e'  # Ubuntu 22.04 for eu-north-1
 DEFAULT_INSTANCE_TYPE = 't3.micro'
-DEFAULT_KEY_NAME = 'my-key'
+DEFAULT_KEY_NAME = 'test'  # Key pair name in AWS (without .pem extension)
 SECURITY_GROUP_NAME = 'crawler-indexer-sg'
 
 # User data script for instance initialization
@@ -78,7 +78,7 @@ After=network.target
 [Service]
 User=ubuntu
 WorkingDirectory=/home/ubuntu/crawler-indexer
-ExecStart=/usr/bin/python3 /home/ubuntu/crawler-indexer/crawler_worker.py
+ExecStart=/usr/bin/python3 /home/ubuntu/crawler-indexer/src/crawler_worker.py
 Restart=on-failure
 RestartSec=5s
 
@@ -124,7 +124,7 @@ After=network.target elasticsearch.service
 [Service]
 User=ubuntu
 WorkingDirectory=/home/ubuntu/crawler-indexer
-ExecStart=/usr/bin/python3 /home/ubuntu/crawler-indexer/indexer_worker.py
+ExecStart=/usr/bin/python3 /home/ubuntu/crawler-indexer/src/indexer_worker.py
 Restart=on-failure
 RestartSec=5s
 
