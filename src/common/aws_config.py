@@ -1,12 +1,16 @@
 import os
 
 # AWS Region
-AWS_REGION = os.getenv('AWS_REGION', 'your-aws-region')  # e.g. 'eu-north-1'
+AWS_REGION = os.getenv('AWS_REGION', 'eu-north-1')
 
-# AWS Credentials - DO NOT hardcode these values in production!
-# Use environment variables instead
-AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID', 'your-access-key-id')
-AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY', 'your-secret-access-key')
+# AWS Credentials - use environment variables without hardcoded fallbacks
+AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
+AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
+
+# Check if credentials are available
+if not AWS_ACCESS_KEY_ID or not AWS_SECRET_ACCESS_KEY:
+    print("WARNING: AWS credentials not found in environment variables.")
+    print("Please set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables.")
 
 # SQS Queue Names and URLs
 CRAWL_QUEUE_NAME = 'crawler-task-queue'
@@ -19,7 +23,7 @@ INDEXER_QUEUE_URL = os.getenv('INDEXER_QUEUE_URL', None)
 MONITORING_QUEUE_URL = os.getenv('MONITORING_QUEUE_URL', None)
 
 # S3 Configuration
-S3_BUCKET_NAME = os.getenv('S3_BUCKET_NAME', 'crawler-indexer-data')
+S3_BUCKET_NAME = os.getenv('S3_BUCKET_NAME', f'crawler-indexer-data-{AWS_ACCESS_KEY_ID[-8:].lower() if AWS_ACCESS_KEY_ID else "default"}')
 
 # S3 Folder Paths
 S3_RAW_CONTENT_PATH = 'raw/'
@@ -32,6 +36,10 @@ ES_HOST = os.getenv('ES_HOST', 'http://localhost:9200')
 # Function to initialize SQS queues and get their URLs
 def init_sqs_queues():
     import boto3
+    
+    # Ensure credentials are available
+    if not AWS_ACCESS_KEY_ID or not AWS_SECRET_ACCESS_KEY:
+        raise ValueError("AWS credentials not set. Please set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables.")
     
     sqs = boto3.client('sqs',
         region_name=AWS_REGION,
@@ -84,6 +92,10 @@ def init_sqs_queues():
 def init_s3_bucket():
     import boto3
     
+    # Ensure credentials are available
+    if not AWS_ACCESS_KEY_ID or not AWS_SECRET_ACCESS_KEY:
+        raise ValueError("AWS credentials not set. Please set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables.")
+    
     s3 = boto3.client('s3',
         region_name=AWS_REGION,
         aws_access_key_id=AWS_ACCESS_KEY_ID,
@@ -96,16 +108,9 @@ def init_s3_bucket():
         print(f"Found existing bucket: {S3_BUCKET_NAME}")
     except:
         try:
-            # Note: for regions other than us-east-1, need to specify LocationConstraint
-            create_bucket_config = {}
-            if AWS_REGION != 'us-east-1':
-                create_bucket_config = {
-                    'LocationConstraint': AWS_REGION
-                }
-            
             response = s3.create_bucket(
                 Bucket=S3_BUCKET_NAME,
-                CreateBucketConfiguration=create_bucket_config
+                CreateBucketConfiguration={'LocationConstraint': AWS_REGION}
             )
             print(f"Created new bucket: {S3_BUCKET_NAME}")
         except Exception as e:
@@ -115,6 +120,12 @@ def init_s3_bucket():
 
 # Initialize AWS resources on module import if running as main script
 if __name__ == "__main__":
+    # Ensure credentials are available
+    if not AWS_ACCESS_KEY_ID or not AWS_SECRET_ACCESS_KEY:
+        print("ERROR: AWS credentials not set. Cannot initialize AWS resources.")
+        import sys
+        sys.exit(1)
+    
     queue_urls = init_sqs_queues()
     print(f"SQS Queues: {queue_urls}")
     
