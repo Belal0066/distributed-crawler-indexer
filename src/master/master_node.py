@@ -5,7 +5,7 @@ import json
 import time
 from datetime import datetime
 from elasticsearch import Elasticsearch
-
+import logging
 # Import common modules
 from common.aws_config import (
     AWS_REGION, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY,
@@ -13,6 +13,9 @@ from common.aws_config import (
 )
 from common.s3_utils import store_metadata, get_metadata
 from common.monitor import master_monitor
+# Configure logging at the top of the file
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 class MasterNode:
     def __init__(self):
@@ -126,7 +129,7 @@ class MasterNode:
         
         for task_id in task_ids:
             try:
-                index_result = self.es.get(index="my_index", id=task_id)
+                index_result = self.es.get(index="snipdex", id=task_id)
                 if index_result:
                     indexed_count += 1
             except:
@@ -173,9 +176,10 @@ class MasterNode:
                     }
                 }
             }
-            
-            response = self.es.search(index="my_index", body=search_query)
-            
+            # logger.debug(f"DEBUG: Sending query to Elasticsearch: {search_query}")
+            response = self.es.search(index="snipdex", body=search_query)
+            # logger.debug(f"DEBUG: Elasticsearch response: {response}")
+
             results = []
             for hit in response['hits']['hits']:
                 source = hit['_source']
@@ -197,12 +201,13 @@ class MasterNode:
                 })
             
             # Update metrics
-            self.monitor.update_metric('searches', 1)
             
+            self.monitor.update_metric('searches', 1)
             return results
             
         except Exception as e:
             self.monitor.update_metric('errors', 1)
+            # logger.error(f"Search failed with error: {str(e)}")
             raise Exception(f"Search failed: {str(e)}")
 
     def check_health(self) -> Dict:
