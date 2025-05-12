@@ -8,7 +8,14 @@ import sys
 import time
 
 # Add the project root to the path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+PROJECT_ROOT = os.path.abspath(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(PROJECT_ROOT)
+
+# Add the src directory to the Python path
+SRC_DIR = os.path.join(PROJECT_ROOT, "src")
+sys.path.append(SRC_DIR)
+
+print("Python path:", sys.path)
 
 # Import the indexer
 from src.indexer.indexer_node import run_indexer
@@ -16,6 +23,8 @@ from src.indexer.indexer_node import run_indexer
 if __name__ == "__main__":
     print("Starting indexer worker...")
     try:
+        # Set the PYTHONPATH environment variable
+        os.environ['PYTHONPATH'] = SRC_DIR
         run_indexer()
     except KeyboardInterrupt:
         print("Indexer worker stopped by user.")
