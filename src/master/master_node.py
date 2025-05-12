@@ -181,6 +181,9 @@ class MasterNode:
             else:
                 processed_query = query
 
+            logger.debug(f"Processed query: {processed_query}")
+            logger.debug(f"Search type: {search_type}")
+
             if search_type == "phrase":
                 search_query = {
                     "query": {
@@ -232,7 +235,9 @@ class MasterNode:
                         }
                     }
                 }
+            logger.debug(f"Elasticsearch query: {search_query}")
             response = self.es.search(index="snipdex", body=search_query)
+            logger.debug(f"Elasticsearch response: {response}")
             results = []
             for hit in response['hits']['hits']:
                 source = hit['_source']
@@ -253,6 +258,7 @@ class MasterNode:
             self.monitor.update_metric('searches', 1)
             return results
         except Exception as e:
+            logger.error(f"Search failed: {str(e)}", exc_info=True)
             self.monitor.update_metric('errors', 1)
             raise Exception(f"Search failed: {str(e)}")
 
