@@ -8,14 +8,21 @@ import time
 import boto3
 import os
 import threading
+import socket
+import uuid
+import random
+from datetime import datetime
 
 # Import common modules
 from common.aws_config import (
     AWS_REGION, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY,
-    INDEXER_QUEUE_NAME
+    INDEXER_QUEUE_NAME, MONITORING_QUEUE_NAME
 )
-from common.s3_utils import get_raw_content, store_index_data
+from common.s3_utils import get_raw_content, store_index_data, get_index_data
 from common.monitor import indexer_monitor
+
+# Generate a unique node ID
+NODE_ID = f"indexer-{socket.gethostname()}-{uuid.uuid4()}"
 
 # Ensure NLTK resources are downloaded
 try:
@@ -26,7 +33,69 @@ except LookupError:
     nltk.download('stopwords')
 
 # Elasticsearch setup
-es = Elasticsearch([os.getenv("ES_HOST", "http://localhost:9200")])
+es = Elasticsearch([os.getenv("ES_HOST", "http://localhost:9200")], timeout=30)
+
+# Create the index if it doesn't exist
+def initialize_elasticsearch():
+    try:
+        # First, check if we can connect to Elasticsearch
+        if not es.ping():
+            print("WARNING: Cannot connect to Elasticsearch server. Is it running?")
+            return False
+
+        # Print Elasticsearch info for debugging
+        try:
+            info = es.info()
+            print(f"Connected to Elasticsearch: {info.get('version', {}).get('number', 'unknown version')}")
+        except Exception as e:
+            print(f"Could not get Elasticsearch info: {str(e)}")
+
+        # Create index if it doesn't exist
+        if not es.indices.exists(index="snipdex"):
+            # Create mapping with settings appropriate for single-node setup
+            mapping = {
+                "settings": {
+                    "number_of_shards": 1,
+                    "number_of_replicas": 0
+                },
+                "mappings": {
+                    "properties": {
+                        "content": {"type": "text"},
+                        "meta_data": {
+                            "properties": {
+                                "url": {"type": "keyword"},
+                                "title": {"type": "text"},
+                                "description": {"type": "text"},
+                                "keywords": {"type": "text"},
+                                "language": {"type": "keyword"}
+                            }
+                        },
+                        "indexed_at": {"type": "date"},
+                        "indexed_by": {"type": "keyword"}
+                    }
+                }
+            }
+            
+            # Create the index with backward-compatible API
+            try:
+                # For ES client >= 7.0
+                es.indices.create(index="snipdex", body=mapping)
+            except TypeError:
+                # For ES client >= 8.0
+                es.indices.create(index="snipdex", **mapping)
+                
+            print("Created Elasticsearch index: snipdex")
+        else:
+            print("Elasticsearch index 'snipdex' already exists")
+            
+        return True
+    except Exception as e:
+        print(f"Error initializing Elasticsearch: {e}")
+        print(f"Error details: {type(e).__name__}: {str(e)}")
+        return False
+
+# Run initialization at module load time
+initialize_elasticsearch()
 
 # Initialize SQS client
 sqs = boto3.client('sqs',
@@ -43,6 +112,50 @@ try:
 except Exception as e:
     print(f"Error connecting to indexer queue: {e}")
     INDEXER_QUEUE_URL = None
+
+# Get monitoring queue URL
+try:
+    response = sqs.get_queue_url(QueueName=MONITORING_QUEUE_NAME)
+    MONITORING_QUEUE_URL = response['QueueUrl']
+    print(f"Connected to monitoring queue: {MONITORING_QUEUE_NAME}")
+except Exception as e:
+    print(f"Error connecting to monitoring queue: {e}")
+    MONITORING_QUEUE_URL = None
+
+# Track indexed documents for replication
+indexed_documents = {}  # document_id -> {timestamp, replicated}
+
+# Configure replication settings
+REPLICATION_FACTOR = 2  # Number of replicas to maintain
+REPLICATION_PROBABILITY = 0.3  # Probability of being selected as a replication node
+
+def send_task_status(task_id, status, details=None):
+    """
+    Send task status update to the monitoring queue
+    """
+    if not MONITORING_QUEUE_URL:
+        print("Monitoring queue URL not available. Skipping task status update.")
+        return
+    
+    # Create status message
+    status_message = {
+        'node_id': NODE_ID,
+        'node_type': 'indexer',
+        'task_id': task_id,
+        'status': status,
+        'timestamp': datetime.now().isoformat(),
+        'details': details or {}
+    }
+    
+    # Send message to queue
+    try:
+        response = sqs.send_message(
+            QueueUrl=MONITORING_QUEUE_URL,
+            MessageBody=json.dumps(status_message)
+        )
+        return response
+    except Exception as e:
+        print(f"Error sending task status: {e}")
 
 # Preprocessing function
 def preprocess_content(content):
@@ -67,11 +180,31 @@ def index_content(data):
         document_id = data.get("document_id")
         content = data.get("content", "")
         meta_data = data.get("meta_data", {})
+        task_type = data.get("task_type", "index")
         
         # Skip if no document ID
         if not document_id:
             print("Missing document ID. Skipping.")
             return {"status": "error", "error": "Missing document ID"}
+        
+        # Send task started status
+        send_task_status(document_id, 'started', {
+            'document_id': document_id,
+            'task_type': task_type
+        })
+        
+        # Check if this is a replication task
+        is_replication = task_type == "replicate"
+        
+        # If replication task, first check if we already have this document
+        if is_replication and document_id in indexed_documents:
+            print(f"Document {document_id} already indexed on this node. Skipping replication.")
+            send_task_status(document_id, 'completed', {
+                'document_id': document_id,
+                'task_type': task_type,
+                'already_indexed': True
+            })
+            return {"status": "already_indexed", "id": document_id}
         
         # Check if content exists
         if not content and "url" in meta_data:
@@ -80,36 +213,94 @@ def index_content(data):
             if raw_content_response["status"] == "success":
                 content = raw_content_response["content"]
         
-        # Skip if no content
-        if not content:
-            print(f"No content for document {document_id}. Skipping.")
-            return {"status": "error", "error": "No content to index"}
-        
-        # Preprocess content
-        preprocessed = preprocess_content(content)
+        # For replication, try to get preprocessed content from S3
+        if is_replication and not content:
+            index_data_response = get_index_data(document_id)
+            if index_data_response["status"] == "success":
+                preprocessed = index_data_response["data"].get("content")
+                meta_data = index_data_response["data"].get("meta_data", meta_data)
+            else:
+                print(f"No content for replication of document {document_id}. Skipping.")
+                send_task_status(document_id, 'failed', {
+                    'document_id': document_id,
+                    'task_type': task_type,
+                    'error': "No content for replication"
+                })
+                return {"status": "error", "error": "No content for replication"}
+        else:
+            # Skip if no content
+            if not content:
+                print(f"No content for document {document_id}. Skipping.")
+                send_task_status(document_id, 'failed', {
+                    'document_id': document_id,
+                    'task_type': task_type,
+                    'error': "No content to index"
+                })
+                return {"status": "error", "error": "No content to index"}
+            
+            # Preprocess content
+            preprocessed = preprocess_content(content)
         
         # Prepare document for indexing
         doc = {
             "content": preprocessed,
             "meta_data": meta_data,
-            "indexed_at": time.time()
+            "indexed_at": datetime.utcnow().isoformat(),
+            "indexed_by": NODE_ID
         }
         
         # Index document
-        resp = es.index(index="my_index", id=document_id, document=doc, refresh=True)
+        try:
+            # First try with the 'body' parameter (common in older versions)
+            resp = es.index(index="snipdex", id=document_id, body=doc, refresh=True)
+            print(f"Successfully indexed document {document_id}")
+        except TypeError as type_error:
+            # If 'body' fails, try with 'document' (newer versions)
+            if "got an unexpected keyword argument 'body'" in str(type_error):
+                print("Retrying with 'document' parameter for newer Elasticsearch versions")
+                resp = es.index(index="snipdex", id=document_id, document=doc, refresh=True)
+                print(f"Successfully indexed document {document_id} using newer API")
+            else:
+                raise
         
         # Store index data in S3
         store_index_data(document_id, doc)
         
+        # Track indexed document
+        indexed_documents[document_id] = {
+            'timestamp': time.time(),
+            'replicated': is_replication
+        }
+        
+        # Send task completed status
+        send_task_status(document_id, 'completed', {
+            'document_id': document_id,
+            'task_type': task_type
+        })
+        
         # Update metrics
         indexer_monitor.update_metric('documents_indexed', 1)
+        if is_replication:
+            indexer_monitor.update_metric('documents_replicated', 1)
         
         return {"status": "indexed", "id": resp["_id"]}
     except Exception as e:
         # Update error metrics
         indexer_monitor.update_metric('errors', 1)
         print(f"Error indexing content: {e}")
+        
+        # Send task failed status
+        send_task_status(document_id, 'failed', {
+            'document_id': document_id,
+            'task_type': task_type,
+            'error': str(e)
+        })
+        
         return {"status": "error", "error": str(e)}
+
+def should_replicate():
+    """Determine if this node should handle replication tasks"""
+    return random.random() < REPLICATION_PROBABILITY
 
 def poll_queue():
     """Poll SQS queue for messages and process them"""
@@ -133,12 +324,19 @@ def poll_queue():
                 receipt_handle = message['ReceiptHandle']
                 body = json.loads(message['Body'])
                 
+                # Check if this is a replication task
+                task_type = body.get('task_type', 'index')
+                if task_type == 'replicate' and not should_replicate():
+                    # Skip replication task if this node is not selected
+                    continue
+                
                 # Process message
-                print(f"Processing message: {body.get('document_id')}")
+                document_id = body.get('document_id')
+                print(f"Processing message: {document_id} (type: {task_type})")
                 result = index_content(body)
                 
                 # If successful, delete message from queue
-                if result.get('status') == 'indexed':
+                if result.get('status') in ['indexed', 'already_indexed']:
                     sqs.delete_message(
                         QueueUrl=INDEXER_QUEUE_URL,
                         ReceiptHandle=receipt_handle
@@ -159,7 +357,10 @@ def run_indexer():
     # Start monitoring
     indexer_monitor.start()
     
-    print("Indexer node started. Polling for messages...")
+    # Set node ID in monitor
+    indexer_monitor.node_id = NODE_ID
+    
+    print(f"Indexer node started with ID {NODE_ID}. Polling for messages...")
     
     try:
         while True:
@@ -171,27 +372,5 @@ def run_indexer():
 
 # Main entrypoint
 if __name__ == "__main__":
-    # Ensure Elasticsearch index exists
-    if not es.indices.exists(index="my_index"):
-        es.indices.create(
-            index="my_index",
-            body={
-                "mappings": {
-                    "properties": {
-                        "content": {"type": "text"},
-                        "meta_data": {
-                            "properties": {
-                                "title": {"type": "text"},
-                                "description": {"type": "text"},
-                                "url": {"type": "keyword"}
-                            }
-                        },
-                        "indexed_at": {"type": "date"}
-                    }
-                }
-            }
-        )
-        print("Created Elasticsearch index: my_index")
-    
     # Run the indexer
     run_indexer()
