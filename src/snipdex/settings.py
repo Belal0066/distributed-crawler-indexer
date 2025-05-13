@@ -106,11 +106,18 @@ try:
     )
     
     # Set AWS credentials as environment variables for Scrapy components
-    os.environ['AWS_REGION'] = AWS_REGION
-    os.environ['AWS_ACCESS_KEY_ID'] = AWS_ACCESS_KEY_ID
-    os.environ['AWS_SECRET_ACCESS_KEY'] = AWS_SECRET_ACCESS_KEY
-    os.environ['S3_BUCKET_NAME'] = S3_BUCKET_NAME
+    # Check if credentials are not None before setting them
+    if AWS_REGION:
+        os.environ['AWS_REGION'] = AWS_REGION
+    if AWS_ACCESS_KEY_ID:
+        os.environ['AWS_ACCESS_KEY_ID'] = AWS_ACCESS_KEY_ID
+    if AWS_SECRET_ACCESS_KEY:
+        os.environ['AWS_SECRET_ACCESS_KEY'] = AWS_SECRET_ACCESS_KEY
+    if S3_BUCKET_NAME:
+        os.environ['S3_BUCKET_NAME'] = S3_BUCKET_NAME
     
     print(f"AWS settings loaded from common.aws_config")
 except ImportError:
     print("Warning: Could not import AWS settings from common.aws_config")
+except Exception as e:
+    print(f"Warning: Error setting AWS credentials: {e}")

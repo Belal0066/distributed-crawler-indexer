@@ -9,14 +9,19 @@ import time
 import os
 import subprocess
 import sys
+import socket
+import uuid
 
 # Add the project root to the path to import common modules
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..')))
 from src.common.aws_config import (
     AWS_REGION, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY,
-    CRAWL_QUEUE_NAME
+    CRAWL_QUEUE_NAME, MONITORING_QUEUE_NAME
 )
 from src.common.monitor import crawler_monitor
+
+# Generate a unique node ID
+NODE_ID = f"crawler-{socket.gethostname()}-{uuid.uuid4()}"
 
 # Initialize SQS client
 sqs = boto3.client('sqs',
@@ -34,10 +39,64 @@ except Exception as e:
     print(f"Error connecting to crawler queue: {e}")
     CRAWLER_QUEUE_URL = None
 
-def start_crawler_for_url(url, allowed_domains=None, job_id=None, depth=1):
+# Get monitoring queue URL
+try:
+    response = sqs.get_queue_url(QueueName=MONITORING_QUEUE_NAME)
+    MONITORING_QUEUE_URL = response['QueueUrl']
+    print(f"Connected to monitoring queue: {MONITORING_QUEUE_NAME}")
+except Exception as e:
+    print(f"Error connecting to monitoring queue: {e}")
+    MONITORING_QUEUE_URL = None
+
+def send_task_status(task_id, status, details=None):
+    """
+    Send task status update to the monitoring queue
+    """
+    if not MONITORING_QUEUE_URL:
+        print("Monitoring queue URL not available. Skipping task status update.")
+        return
+    
+    # Create status message
+    status_message = {
+        'node_id': NODE_ID,
+        'node_type': 'crawler',
+        'task_id': task_id,
+        'status': status,
+        'timestamp': datetime.now(timezone.utc).isoformat(),
+        'details': details or {}
+    }
+    
+    # Send message to queue
+    try:
+        response = sqs.send_message(
+            QueueUrl=MONITORING_QUEUE_URL,
+            MessageBody=json.dumps(status_message)
+        )
+        return response
+    except Exception as e:
+        print(f"Error sending task status: {e}")
+
+def start_crawler_for_url(url, allowed_domains=None, job_id=None, depth=1, task_id=None):
     """
     Start a Scrapy crawler for a given URL and parameters.
     """
+    # Get the scrapy project directory (where scrapy.cfg is located)
+    project_root = os.path.abspath(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    
+    # Get the src directory for Python path
+    src_dir = os.path.abspath(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+    
+    # Generate task ID if not provided
+    if not task_id:
+        task_id = f"task-{int(time.time())}-{hash(url) % 10000}"
+    
+    # Send task started status
+    send_task_status(task_id, 'started', {
+        'url': url,
+        'job_id': job_id,
+        'depth': depth
+    })
+    
     # Prepare arguments for Scrapy crawl
     allowed_domains_str = ','.join(allowed_domains.split(',')) if allowed_domains else ''
     cmd = [
@@ -45,18 +104,53 @@ def start_crawler_for_url(url, allowed_domains=None, job_id=None, depth=1):
         '-a', f'start_urls={url}',
         '-a', f'allowed_domains={allowed_domains_str}',
         '-a', f'job_id={job_id}',
-        '-a', f'depth={depth}'
+        '-a', f'depth={depth}',
+        '-a', f'task_id={task_id}'
     ]
     
     # Run Scrapy as a subprocess
     try:
         print(f"Starting crawler for {url}")
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        print(f"Running command: {' '.join(cmd)}")
+        print(f"From directory: {project_root}")
+        
+        # Set up environment variables for Scrapy
+        env_vars = dict(os.environ)
+        env_vars['PYTHONPATH'] = src_dir
+        
+        # Run the command from the scrapy project root directory (where scrapy.cfg is)
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            cwd=project_root,
+            env=env_vars
+        )
         
         # Log the result
         print(f"Crawler finished for {url} with return code: {result.returncode}")
         if result.returncode != 0:
-            print(f"Crawler error: {result.stderr}")
+            print(f"Crawler error output:")
+            print(result.stderr)
+            print(f"Crawler standard output:")
+            print(result.stdout)
+            
+            # Send task failed status
+            send_task_status(task_id, 'failed', {
+                'url': url,
+                'job_id': job_id,
+                'error': result.stderr,
+                'returncode': result.returncode
+            })
+        else:
+            print(f"Crawler standard output:")
+            print(result.stdout)
+            
+            # Send task completed status
+            send_task_status(task_id, 'completed', {
+                'url': url,
+                'job_id': job_id
+            })
         
         # Update monitoring metrics
         crawler_monitor.update_metric('crawl_tasks_processed', 1)
@@ -67,15 +161,27 @@ def start_crawler_for_url(url, allowed_domains=None, job_id=None, depth=1):
             'status': 'finished' if result.returncode == 0 else 'error',
             'url': url,
             'job_id': job_id,
-            'returncode': result.returncode
+            'task_id': task_id,
+            'returncode': result.returncode,
+            'error': result.stderr if result.returncode != 0 else None,
+            'output': result.stdout
         }
     except Exception as e:
         print(f"Error starting crawler: {e}")
         crawler_monitor.update_metric('errors', 1)
+        
+        # Send task failed status
+        send_task_status(task_id, 'failed', {
+            'url': url,
+            'job_id': job_id,
+            'error': str(e)
+        })
+        
         return {
             'status': 'error',
             'url': url,
             'job_id': job_id,
+            'task_id': task_id,
             'error': str(e)
         }
 
@@ -107,6 +213,7 @@ def poll_queue():
                 url = body.get('url')
                 allowed_domains = body.get('allowed_domains', '')
                 job_id = body.get('job_id')
+                task_id = body.get('task_id')
                 depth = int(body.get('depth', 1))
                 
                 # Skip if no URL
@@ -115,7 +222,7 @@ def poll_queue():
                     continue
                 
                 # Start crawler
-                result = start_crawler_for_url(url, allowed_domains, job_id, depth)
+                result = start_crawler_for_url(url, allowed_domains, job_id, depth, task_id)
                 
                 # Delete message from queue if successful
                 if result.get('status') == 'finished':
@@ -125,7 +232,11 @@ def poll_queue():
                     )
                     print(f"Processed and removed task for URL: {url}")
                 else:
-                    print(f"Failed to process task for URL: {url}, error: {result.get('error')}")
+                    error_msg = result.get('error', 'Unknown error')
+                    print(f"Failed to process task for URL: {url}")
+                    print(f"Error details: {error_msg}")
+                    if result.get('output'):
+                        print(f"Crawler output: {result.get('output')}")
                     # Message will be returned to the queue after visibility timeout expires
             except Exception as e:
                 print(f"Error processing message: {e}")
@@ -141,7 +252,10 @@ def run_crawler_worker():
     # Start monitoring
     crawler_monitor.start()
     
-    print("Crawler worker started. Polling for messages...")
+    # Set node ID in monitor
+    crawler_monitor.node_id = NODE_ID
+    
+    print(f"Crawler worker started with ID {NODE_ID}. Polling for messages...")
     
     try:
         while True:
@@ -156,7 +270,7 @@ class CrawleriSpider(scrapy.Spider):
     allowed_domains = []
     start_urls = []
 
-    def __init__(self, start_urls=None, allowed_domains=None, job_id=None, depth=None, *args, **kwargs):
+    def __init__(self, start_urls=None, allowed_domains=None, job_id=None, depth=None, task_id=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if start_urls:
             self.start_urls = start_urls.split(",")
@@ -164,6 +278,14 @@ class CrawleriSpider(scrapy.Spider):
             self.allowed_domains = allowed_domains.split(",")
         self.job_id = job_id
         self.depth = int(depth) if depth else None
+        self.task_id = task_id
+        
+        # Send task progress status
+        if self.task_id:
+            send_task_status(self.task_id, 'crawling', {
+                'url': self.start_urls[0] if self.start_urls else None,
+                'job_id': self.job_id
+            })
 
     def parse(self, response):
         loader = ItemLoader(item=SnipdexItem(), response=response)

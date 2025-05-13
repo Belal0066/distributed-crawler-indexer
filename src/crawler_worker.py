@@ -7,15 +7,25 @@ import os
 import sys
 import time
 
-# Add the project root to the path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Add the project root and src directory to the path
+PROJECT_ROOT = os.path.abspath(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(PROJECT_ROOT)
+
+# Add the src directory to the Python path (for Scrapy to find the snipdex module)
+SRC_DIR = os.path.join(PROJECT_ROOT, "src")
+sys.path.append(SRC_DIR)
+
+print("Python path:", sys.path)
 
 # Import the crawler worker runner
 from src.snipdex.spiders.crawlerI import run_crawler_worker
 
 if __name__ == "__main__":
     print("Starting crawler worker...")
+    print(f"Project root: {PROJECT_ROOT}")
+    print(f"Source directory added to path: {SRC_DIR}")
     try:
+        os.environ['PYTHONPATH'] = SRC_DIR
         run_crawler_worker()
     except KeyboardInterrupt:
         print("Crawler worker stopped by user.")

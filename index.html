@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Distributed Crawler & Indexer</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Distributed Crawler & Indexer</h1>
+            <div class="system-status">
+                <span class="status-indicator" id="systemStatus"></span>
+                <span id="statusText">Checking system status...</span>
+            </div>
+        </header>
+
+        <nav>
+            <ul class="tabs">
+                <li class="tab-item active" data-tab="crawl">Crawl</li>
+                <li class="tab-item" data-tab="search">Search</li>
+                <li class="tab-item" data-tab="monitor">Monitor</li>
+            </ul>
+        </nav>
+
+        <main>
+            <!-- Crawl Tab -->
+            <section id="crawl" class="tab-content active">
+                <h2>Start a New Crawl</h2>
+                <div class="card">
+                    <form id="crawlForm">
+                        <div class="form-group">
+                            <label for="seedUrls">Seed URLs (one per line)</label>
+                            <textarea id="seedUrls" rows="5" placeholder="https://example.com&#10;https://another-site.org"></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="crawlDepth">Crawl Depth</label>
+                            <select id="crawlDepth">
+                                <option value="1">1 - Seed URLs only</option>
+                                <option value="2" selected>2 - Seed URLs + linked pages</option>
+                                <option value="3">3 - Deep crawl</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="maxUrls">Maximum URLs to crawl</label>
+                            <input type="number" id="maxUrls" value="100" min="1" max="1000">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="crawlOptions">Crawl Options</label>
+                            <div class="checkbox-group">
+                                <label>
+                                    <input type="checkbox" id="followExternalLinks">
+                                    Follow external links
+                                </label>
+                                <label>
+                                    <input type="checkbox" id="respectRobotsTxt" checked>
+                                    Respect robots.txt
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="form-actions">
+                            <button type="submit" class="btn primary">Start Crawling</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="card" id="recentCrawls">
+                    <h3>Recent Crawls</h3>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Started</th>
+                                    <th>URLs</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recentCrawlsList">
+                                <!-- Will be populated by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Search Tab -->
+            <section id="search" class="tab-content">
+                <h2>Search Indexed Content</h2>
+                <div class="card">
+                    <form id="searchForm">
+                        <div class="form-group">
+                            <div class="search-box">
+                                <input type="text" id="searchQuery" placeholder="Enter your search query...">
+                                <button type="submit" class="btn primary">Search</button>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="searchOptions">Search Options</label>
+                            <div class="checkbox-group">
+                                <label>
+                                    <input type="checkbox" id="fullText" checked>
+                                    Full-text search
+                                </label>
+                                <label>
+                                    <input type="checkbox" id="titleOnly">
+                                    Title only
+                                </label>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="card" id="searchResults">
+                    <h3>Search Results</h3>
+                    <div id="resultsCount"></div>
+                    <div id="searchResultsList">
+                        <!-- Will be populated by JavaScript -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- Monitor Tab -->
+            <section id="monitor" class="tab-content">
+                <h2>System Monitoring</h2>
+                
+                <div class="dashboard">
+                    <div class="card stat-card">
+                        <h3>Nodes</h3>
+                        <div class="stat-value" id="activeNodes">-</div>
+                        <div class="stat-label">Active</div>
+                    </div>
+                    
+                    <div class="card stat-card">
+                        <h3>Queue</h3>
+                        <div class="stat-value" id="queueSize">-</div>
+                        <div class="stat-label">Pending URLs</div>
+                    </div>
+                    
+                    <div class="card stat-card">
+                        <h3>Crawled</h3>
+                        <div class="stat-value" id="crawledUrls">-</div>
+                        <div class="stat-label">URLs</div>
+                    </div>
+                    
+                    <div class="card stat-card">
+                        <h3>Indexed</h3>
+                        <div class="stat-value" id="indexedDocs">-</div>
+                        <div class="stat-label">Documents</div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <h3>Node Status</h3>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Node ID</th>
+                                    <th>Type</th>
+                                    <th>Status</th>
+                                    <th>Last Seen</th>
+                                    <th>Metrics</th>
+                                </tr>
+                            </thead>
+                            <tbody id="nodeStatusList">
+                                <!-- Will be populated by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <h3>Queue Status</h3>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Queue</th>
+                                    <th>Pending</th>
+                                    <th>In Flight</th>
+                                    <th>Processed</th>
+                                </tr>
+                            </thead>
+                            <tbody id="queueStatusList">
+                                <!-- Will be populated by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>© 2023 Distributed Crawler-Indexer System</p>
+        </footer>
+    </div>
+
+    <!-- Modal for crawl details -->
+    <div id="crawlDetailsModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Crawl Details</h2>
+            <div id="crawlDetailsContent">
+                <!-- Will be populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

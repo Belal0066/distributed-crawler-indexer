@@ -5,7 +5,11 @@ import json
 import time
 from datetime import datetime
 from elasticsearch import Elasticsearch
-
+import logging
+from nltk.corpus import stopwords
+from nltk.stem import PorterStemmer
+from nltk.tokenize import word_tokenize
+import nltk
 # Import common modules
 from common.aws_config import (
     AWS_REGION, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY,
@@ -13,6 +17,9 @@ from common.aws_config import (
 )
 from common.s3_utils import store_metadata, get_metadata
 from common.monitor import master_monitor
+# Configure logging at the top of the file
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 class MasterNode:
     def __init__(self):
@@ -24,7 +31,7 @@ class MasterNode:
         )
         
         # Initialize Elasticsearch
-        self.es = Elasticsearch([os.getenv("ES_HOST", "http://localhost:9200")])
+        self.es = Elasticsearch(os.getenv("ES_HOST", "http://localhost:9200").split())
         
         # Get queue URLs
         self.get_queue_urls()
@@ -126,7 +133,7 @@ class MasterNode:
         
         for task_id in task_ids:
             try:
-                index_result = self.es.get(index="my_index", id=task_id)
+                index_result = self.es.get(index="snipdex", id=task_id)
                 if index_result:
                     indexed_count += 1
             except:
@@ -151,40 +158,93 @@ class MasterNode:
             'index_status': index_status
         }
 
-    def search_content(self, query: str) -> List[Dict]:
-        """Search through indexed content using Elasticsearch."""
+    def preprocess_query(self, query: str) -> str:
+        # Tokenize the query (split into words)
+        tokens = word_tokenize(query.lower())
+        # Remove stopwords
+        stop_words = set(stopwords.words("english"))
+        filtered_tokens = [word for word in tokens if word.isalnum() and word not in stop_words]
+        # Apply stemming
+        stemmer = PorterStemmer()
+        stemmed_tokens = [stemmer.stem(word) for word in filtered_tokens]
+        # Join tokens back into a single string
+        return " ".join(stemmed_tokens)
+
+    def search_content(self, query: str, search_type: str = "match") -> List[Dict]:
+        """Search through indexed content using Elasticsearch with different search types."""
         if not query:
             return []
-        
         try:
-            search_query = {
-                "query": {
-                    "multi_match": {
-                        "query": query,
-                        "fields": ["content", "meta_data.title^2", "meta_data.description"],
-                        "type": "best_fields"
-                    }
-                },
-                "highlight": {
-                    "fields": {
-                        "content": {},
-                        "meta_data.title": {},
-                        "meta_data.description": {}
+            # Preprocess query for match/phrase
+            if search_type in ("match", "phrase"):
+                processed_query = self.preprocess_query(query)
+            else:
+                processed_query = query
+
+            logger.debug(f"Processed query: {processed_query}")
+            logger.debug(f"Search type: {search_type}")
+
+            if search_type == "phrase":
+                search_query = {
+                    "query": {
+                        "multi_match": {
+                            "query": processed_query,
+                            "fields": ["content", "meta_data.title^2", "meta_data.description"],
+                            "type": "phrase"
+                        }
+                    },
+                    "highlight": {
+                        "fields": {
+                            "content": {},
+                            "meta_data.title": {},
+                            "meta_data.description": {}
+                        }
                     }
                 }
-            }
-            
-            response = self.es.search(index="my_index", body=search_query)
-            
+            elif search_type == "boolean":
+                search_query = {
+                    "query": {
+                        "query_string": {
+                            "query": processed_query,
+                            "fields": ["content", "meta_data.title^2", "meta_data.description"]
+                        }
+                    },
+                    "highlight": {
+                        "fields": {
+                            "content": {},
+                            "meta_data.title": {},
+                            "meta_data.description": {}
+                        }
+                    }
+                }
+            else:  # Default to 'match' with fuzziness
+                search_query = {
+                    "query": {
+                        "multi_match": {
+                            "query": processed_query,
+                            "fields": ["content", "meta_data.title^2", "meta_data.description"],
+                            "type": "best_fields",
+                            "fuzziness": "AUTO"
+                        }
+                    },
+                    "highlight": {
+                        "fields": {
+                            "content": {},
+                            "meta_data.title": {},
+                            "meta_data.description": {}
+                        }
+                    }
+                }
+            logger.debug(f"Elasticsearch query: {search_query}")
+            response = self.es.search(index="snipdex", body=search_query)
+            logger.debug(f"Elasticsearch response: {response}")
             results = []
             for hit in response['hits']['hits']:
                 source = hit['_source']
                 meta_data = source.get('meta_data', {})
-                
                 highlights = hit.get('highlight', {})
                 content_highlight = ' '.join(highlights.get('content', [])) if highlights.get('content') else None
                 title_highlight = ' '.join(highlights.get('meta_data.title', [])) if highlights.get('meta_data.title') else None
-                
                 results.append({
                     'url': hit['_id'],
                     'title': meta_data.get('title', 'No title'),
@@ -195,13 +255,10 @@ class MasterNode:
                         'title': title_highlight
                     }
                 })
-            
-            # Update metrics
             self.monitor.update_metric('searches', 1)
-            
             return results
-            
         except Exception as e:
+            logger.error(f"Search failed: {str(e)}", exc_info=True)
             self.monitor.update_metric('errors', 1)
             raise Exception(f"Search failed: {str(e)}")
 
@@ -251,4 +308,4 @@ if __name__ == "__main__":
             time.sleep(60)
     except KeyboardInterrupt:
         print("Master Node stopping...")
-        master.monitor.stop() 
+        master.monitor.stop()

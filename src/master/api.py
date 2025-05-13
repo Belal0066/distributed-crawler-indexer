@@ -19,6 +19,7 @@ class CrawlRequest(BaseModel):
 
 class SearchRequest(BaseModel):
     query: str
+    search_type: Optional[str] = "match"
 
 # API routes
 @app.get("/")
@@ -58,7 +59,7 @@ def search(request: SearchRequest):
     Search through the indexed content
     """
     try:
-        results = master_node.search_content(request.query)
+        results = master_node.search_content(request.query, search_type=request.search_type)
         return results
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
