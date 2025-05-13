@@ -32,7 +32,7 @@ with tab1:
             "delay": delay
         }
         try:
-            response = requests.post(f"{MASTER_URL}/crawl", json=config, timeout=20)
+            response = requests.post(f"{MASTER_URL}/crawl", json=config, timeout=40)
             if response.ok:
                 job_id = response.json().get("job_id")
                 st.success(f"Crawl started successfully! Job ID: {job_id}")
@@ -70,6 +70,11 @@ with tab3:
                     st.write(f"**URL:** {r.get('url', 'N/A')}")
                     st.write(f"**Relevance Score:** {r.get('score', 0):.2f}")
                     st.write(r.get("summary", "No snippet available"))
+                    # --- Raw HTML Preview ---
+                    raw_content = r.get("raw_content")
+                    if raw_content:
+                        with st.expander("🔎 Preview Raw HTML Content"):
+                            st.components.v1.html(raw_content, height=400, scrolling=True)
                     st.markdown("---")
             else:
                 st.error(f"Search failed: {response.status_code}")
