@@ -15,7 +15,7 @@ from common.aws_config import (
     AWS_REGION, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY,
     CRAWL_QUEUE_NAME, INDEXER_QUEUE_NAME, MONITORING_QUEUE_NAME
 )
-from common.s3_utils import store_metadata, get_metadata
+from common.s3_utils import store_metadata, get_metadata, get_raw_content
 from common.monitor import master_monitor
 # Configure logging at the top of the file
 logging.basicConfig(level=logging.DEBUG)
@@ -157,7 +157,7 @@ class MasterNode:
             'crawl_status': job_metadata.get('status', 'unknown'),
             'index_status': index_status
         }
-
+        
     def preprocess_query(self, query: str) -> str:
         # Tokenize the query (split into words)
         tokens = word_tokenize(query.lower())
@@ -242,14 +242,26 @@ class MasterNode:
             for hit in response['hits']['hits']:
                 source = hit['_source']
                 meta_data = source.get('meta_data', {})
+                url = meta_data.get('url', hit['_id'])
                 highlights = hit.get('highlight', {})
                 content_highlight = ' '.join(highlights.get('content', [])) if highlights.get('content') else None
                 title_highlight = ' '.join(highlights.get('meta_data.title', [])) if highlights.get('meta_data.title') else None
+
+                # Fetch raw content from S3
+                raw_content = None
+                try:
+                    s3_result = get_raw_content(url)
+                    if s3_result.get("status") == "success":
+                        raw_content = s3_result.get("content")
+                except Exception as e:
+                    logger.error(f"Failed to fetch raw content for {url}: {e}")
+
                 results.append({
-                    'url': hit['_id'],
+                    'url': url,
                     'title': meta_data.get('title', 'No title'),
                     'summary': content_highlight or meta_data.get('description', '')[:200],
                     'score': hit['_score'],
+                    'raw_content': raw_content,
                     'highlights': {
                         'content': content_highlight,
                         'title': title_highlight
