@@ -31,7 +31,7 @@ class MasterNode:
         )
         
         # Initialize Elasticsearch
-        self.es = Elasticsearch([os.getenv("ES_HOST", "http://localhost:9200")])
+        self.es = Elasticsearch(os.getenv("ES_HOST", "http://localhost:9200").split())
         
         # Get queue URLs
         self.get_queue_urls()
