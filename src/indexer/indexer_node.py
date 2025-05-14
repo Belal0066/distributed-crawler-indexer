@@ -307,6 +307,61 @@ def should_replicate():
     """Determine if this node should handle replication tasks"""
     return random.random() < REPLICATION_PROBABILITY
 
+def replicate_documents():
+    """
+    Check for documents that need replication and create replication tasks
+    """
+    try:
+        # Find documents that need more replicas
+        current_time = time.time()
+        documents_to_replicate = []
+        
+        # Find documents indexed by this node that need replication
+        for doc_id, data in indexed_documents.items():
+            # Only consider documents we've indexed but not already replicated
+            if not data.get('replicated', False):
+                documents_to_replicate.append(doc_id)
+        
+        # Limit the number of documents to replicate in one batch
+        max_to_replicate = 5
+        if len(documents_to_replicate) > max_to_replicate:
+            documents_to_replicate = random.sample(documents_to_replicate, max_to_replicate)
+        
+        # Create replication tasks
+        for doc_id in documents_to_replicate:
+            print(f"Creating replication task for document: {doc_id}")
+            
+            # Get document data from ES
+            try:
+                doc_data = get_index_data(doc_id)
+                if doc_data['status'] != 'success':
+                    print(f"Could not get data for document {doc_id}: {doc_data.get('error')}")
+                    continue
+                
+                # Create replication message
+                replication_message = {
+                    'document_id': doc_id,
+                    'task_type': 'replicate',
+                    'timestamp': datetime.now().isoformat()
+                }
+                
+                # Send to queue
+                if INDEXER_QUEUE_URL:
+                    response = sqs.send_message(
+                        QueueUrl=INDEXER_QUEUE_URL,
+                        MessageBody=json.dumps(replication_message)
+                    )
+                    print(f"Sent replication task for document: {doc_id}")
+                    
+                    # Mark as replicated
+                    indexed_documents[doc_id]['replicated'] = True
+                else:
+                    print("Indexer queue URL not available. Skipping replication.")
+            except Exception as e:
+                print(f"Error creating replication task for {doc_id}: {e}")
+    except Exception as e:
+        print(f"Error in document replication: {e}")
+
 def poll_queue():
     """Poll SQS queue for messages and process them"""
     if not INDEXER_QUEUE_URL:
