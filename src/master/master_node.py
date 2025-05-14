@@ -33,7 +33,7 @@ class MasterNode:
         
         # Initialize Elasticsearch with longer timeout and retry configuration
         self.es = Elasticsearch(
-            hosts=[os.getenv("ES_HOST", "http://localhost:9200")],
+            hosts=os.getenv("ES_HOST", "http://localhost:9200").split(),  # Split by spaces
             request_timeout=60,  # 60 second timeout
             retry_on_timeout=True,
             max_retries=3

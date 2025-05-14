@@ -34,7 +34,7 @@ except LookupError:
     nltk.download('stopwords')
 
 # Elasticsearch setup
-es = Elasticsearch([os.getenv("ES_HOST", "http://localhost:9200")], timeout=30)
+es = Elasticsearch(os.getenv("ES_HOST", "http://localhost:9200").split(), timeout=30)
 
 # Create the index if it doesn't exist
 def initialize_elasticsearch():

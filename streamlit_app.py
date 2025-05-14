@@ -46,7 +46,7 @@ with tab2:
     job_id = st.text_input("Enter Job ID to Check Status")
     if st.button("🔍 Get Status"):
         try:
-            response = requests.get(f"{MASTER_URL}/job/{job_id}", timeout=10)
+            response = requests.get(f"{MASTER_URL}/job/{job_id}", timeout=40)
             if response.ok:
                 st.json(response.json())
             else:
@@ -60,7 +60,7 @@ with tab3:
     search_type = st.selectbox("Search Type", ["match", "phrase", "boolean"])
     if st.button("🔎 Search"):
         try:
-            response = requests.post(f"{MASTER_URL}/search", json={"query": query, "search_type": search_type}, timeout=10)
+            response = requests.post(f"{MASTER_URL}/search", json={"query": query, "search_type": search_type}, timeout=40)
             if response.ok:
                 results = response.json()
                 if not results:
@@ -85,7 +85,7 @@ with tab4:
     st.header("System Health Check")
     if st.button("🩺 Check System Health"):
         try:
-            response = requests.get(f"{MASTER_URL}/health", timeout=10)
+            response = requests.get(f"{MASTER_URL}/health", timeout=30)
             if response.ok:
                 st.json(response.json())
             else:
