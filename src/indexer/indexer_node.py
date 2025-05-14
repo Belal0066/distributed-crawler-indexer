@@ -20,6 +20,7 @@ from common.aws_config import (
 )
 from common.s3_utils import get_raw_content, store_index_data, get_index_data
 from common.monitor import indexer_monitor
+from common.fault_tolerance import fault_manager
 
 # Generate a unique node ID
 NODE_ID = f"indexer-{socket.gethostname()}-{uuid.uuid4()}"
@@ -266,11 +267,17 @@ def index_content(data):
         # Store index data in S3
         store_index_data(document_id, doc)
         
+        # Register this task with the fault tolerance manager
+        fault_manager.register_task(document_id, NODE_ID)
+        
         # Track indexed document
         indexed_documents[document_id] = {
             'timestamp': time.time(),
             'replicated': is_replication
         }
+        
+        # Mark task as complete in fault tolerance manager
+        fault_manager.complete_task(document_id)
         
         # Send task completed status
         send_task_status(document_id, 'completed', {
@@ -290,9 +297,7 @@ def index_content(data):
         print(f"Error indexing content: {e}")
         
         # Send task failed status
-        send_task_status(document_id, 'failed', {
-            'document_id': document_id,
-            'task_type': task_type,
+        send_task_status(document_id if document_id else "unknown", 'failed', {
             'error': str(e)
         })
         
@@ -352,23 +357,44 @@ def poll_queue():
         print(f"Error polling queue: {e}")
         indexer_monitor.update_metric('errors', 1)
 
-def run_indexer():
-    """Main loop for the indexer node"""
-    # Start monitoring
-    indexer_monitor.start()
+def run_indexer(check_shutdown=None):
+    """
+    Main function to run the indexer
     
-    # Set node ID in monitor
-    indexer_monitor.node_id = NODE_ID
+    Args:
+        check_shutdown: A function that returns True if shutdown is requested
+    """
+    print("Starting indexer...")
+    print(f"Indexer ID: {NODE_ID}")
     
-    print(f"Indexer node started with ID {NODE_ID}. Polling for messages...")
+    # Initialize Elasticsearch index if needed
+    initialize_elasticsearch()
     
     try:
         while True:
+            # Check if shutdown requested
+            if check_shutdown and check_shutdown():
+                print("Shutdown requested, stopping indexer")
+                break
+                
+            # Poll and process tasks
             poll_queue()
-            time.sleep(1)  # Small delay between polls
+            
+            # Also check for replication needs
+            if should_replicate():
+                replicate_documents()
+            
+            # Brief pause between polls
+            time.sleep(1)
     except KeyboardInterrupt:
-        print("Indexer node stopping...")
-        indexer_monitor.stop()
+        print("Indexer interrupted")
+    except Exception as e:
+        print(f"Indexer error: {e}")
+        indexer_monitor.update_metric('errors', 1)
+        raise  # Re-raise to be handled by the parent
+    finally:
+        print("Indexer stopping...")
+        # We don't stop the monitor as it may still be sending heartbeats
 
 # Main entrypoint
 if __name__ == "__main__":

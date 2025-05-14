@@ -17,6 +17,7 @@ from common.aws_config import (
 )
 from common.s3_utils import store_metadata, get_metadata, get_raw_content
 from common.monitor import master_monitor
+from common.fault_tolerance import fault_manager
 # Configure logging at the top of the file
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -39,6 +40,9 @@ class MasterNode:
         # Start monitoring
         self.monitor = master_monitor
         self.monitor.start()
+        
+        # Start fault tolerance manager
+        fault_manager.start()
     
     def get_queue_urls(self):
         """Get SQS queue URLs"""
@@ -275,39 +279,62 @@ class MasterNode:
             raise Exception(f"Search failed: {str(e)}")
 
     def check_health(self) -> Dict:
-        """Check the health of all components."""
+        """Check the overall system health."""
         try:
             # Check SQS queues
+            queues_ok = True
             try:
-                self.sqs.get_queue_attributes(QueueUrl=self.crawl_queue_url, AttributeNames=['All'])
-                crawl_queue_status = "connected"
-            except:
-                crawl_queue_status = "disconnected"
-            
-            try:
-                self.sqs.get_queue_attributes(QueueUrl=self.indexer_queue_url, AttributeNames=['All'])
-                indexer_queue_status = "connected"
-            except:
-                indexer_queue_status = "disconnected"
+                # Check if we can connect to the queues (just get attributes)
+                self.sqs.get_queue_attributes(
+                    QueueUrl=self.crawl_queue_url,
+                    AttributeNames=['ApproximateNumberOfMessages']
+                )
+                self.sqs.get_queue_attributes(
+                    QueueUrl=self.indexer_queue_url,
+                    AttributeNames=['ApproximateNumberOfMessages']
+                )
+            except Exception as e:
+                queues_ok = False
+                print(f"SQS queue check failed: {e}")
             
             # Check Elasticsearch
-            es_status = self.es.ping()
+            es_ok = True
+            try:
+                es_status = self.es.cluster.health()
+                es_status = es_status.get('status')  # 'green', 'yellow', or 'red'
+            except Exception as e:
+                es_ok = False
+                es_status = f"Error: {str(e)}"
+                print(f"Elasticsearch check failed: {e}")
             
-            # Get node metrics
-            node_metrics = self.monitor.metrics
+            # Get fault tolerance status
+            ft_status = fault_manager.get_status()
             
+            # Format response
             return {
-                "status": "ok",
-                "crawl_queue": crawl_queue_status,
-                "indexer_queue": indexer_queue_status,
-                "elasticsearch": "connected" if es_status else "disconnected",
-                "metrics": node_metrics
+                "status": "healthy" if queues_ok and es_ok else "degraded",
+                "timestamp": datetime.now().isoformat(),
+                "services": {
+                    "sqs": {
+                        "status": "online" if queues_ok else "offline"
+                    },
+                    "elasticsearch": {
+                        "status": es_status
+                    },
+                    "fault_tolerance": ft_status
+                }
             }
         except Exception as e:
+            # Return error
             return {
                 "status": "error",
-                "error": str(e)
+                "error": str(e),
+                "timestamp": datetime.now().isoformat()
             }
+            
+    def check_fault_tolerance(self) -> Dict:
+        """Get detailed fault tolerance status."""
+        return fault_manager.get_status()
 
 # Main entrypoint
 if __name__ == "__main__":

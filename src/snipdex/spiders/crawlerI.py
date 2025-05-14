@@ -11,6 +11,7 @@ import subprocess
 import sys
 import socket
 import uuid
+from src.common.fault_tolerance import fault_manager
 
 # Add the project root to the path to import common modules
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..')))
@@ -96,6 +97,9 @@ def start_crawler_for_url(url, allowed_domains=None, job_id=None, depth=1, task_
         'job_id': job_id,
         'depth': depth
     })
+    
+    # Register this task with the fault tolerance manager
+    fault_manager.register_task(task_id, NODE_ID)
     
     # Prepare arguments for Scrapy crawl
     allowed_domains_str = ','.join(allowed_domains.split(',')) if allowed_domains else ''
@@ -231,6 +235,9 @@ def poll_queue():
                         ReceiptHandle=receipt_handle
                     )
                     print(f"Processed and removed task for URL: {url}")
+                    
+                    # Mark task as complete in fault tolerance manager
+                    fault_manager.complete_task(task_id)
                 else:
                     error_msg = result.get('error', 'Unknown error')
                     print(f"Failed to process task for URL: {url}")
@@ -245,25 +252,40 @@ def poll_queue():
         print(f"Error polling queue: {e}")
         crawler_monitor.update_metric('errors', 1)
 
-def run_crawler_worker():
+def run_crawler_worker(check_shutdown=None):
     """
     Main function to run the crawler worker
+
+    Args:
+        check_shutdown: A function that returns True if shutdown is requested
     """
+    print("Starting crawler worker...")
+    print(f"Worker ID: {NODE_ID}")
+    
     # Start monitoring
     crawler_monitor.start()
     
-    # Set node ID in monitor
-    crawler_monitor.node_id = NODE_ID
-    
-    print(f"Crawler worker started with ID {NODE_ID}. Polling for messages...")
-    
     try:
         while True:
+            # Check if shutdown requested
+            if check_shutdown and check_shutdown():
+                print("Shutdown requested, stopping crawler worker")
+                break
+                
+            # Poll and process tasks
             poll_queue()
-            time.sleep(1)  # Small delay between polls
+            
+            # Brief pause between polls
+            time.sleep(1)
     except KeyboardInterrupt:
+        print("Crawler worker interrupted")
+    except Exception as e:
+        print(f"Crawler worker error: {e}")
+        crawler_monitor.update_metric('errors', 1)
+        raise  # Re-raise to be handled by the parent
+    finally:
         print("Crawler worker stopping...")
-        crawler_monitor.stop()
+        # We don't stop the monitor as it may still be sending heartbeats
 
 class CrawleriSpider(scrapy.Spider):
     name = "crawlerI"

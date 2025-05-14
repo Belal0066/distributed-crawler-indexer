@@ -6,6 +6,8 @@ from .aws_config import (
     S3_BUCKET_NAME, S3_RAW_CONTENT_PATH, S3_INDEX_PATH, S3_METADATA_PATH,
     init_s3_bucket
 )
+import time
+import random
 
 # Initialize S3 client
 s3 = boto3.client('s3',
@@ -17,6 +19,40 @@ s3 = boto3.client('s3',
 # Initialize S3 bucket
 init_s3_bucket()
 
+def _s3_operation_with_retry(operation_func, max_retries=3, initial_backoff=1):
+    """
+    Execute an S3 operation with retry logic
+    
+    Args:
+        operation_func: Function to execute (should take no args and handle its own params)
+        max_retries: Maximum number of retry attempts
+        initial_backoff: Initial backoff time in seconds
+    
+    Returns:
+        Result of the operation or raises the last exception
+    """
+    retries = 0
+    last_exception = None
+    
+    while retries <= max_retries:
+        try:
+            return operation_func()
+        except Exception as e:
+            last_exception = e
+            retries += 1
+            
+            # If reached max retries, re-raise the exception
+            if retries > max_retries:
+                raise
+            
+            # Exponential backoff with jitter
+            backoff = initial_backoff * (2 ** (retries - 1))
+            jitter = random.uniform(0, 0.1 * backoff)
+            sleep_time = backoff + jitter
+            
+            print(f"S3 operation failed, retrying {retries}/{max_retries} after {sleep_time:.2f}s: {str(e)}")
+            time.sleep(sleep_time)
+
 def store_raw_content(url, content, content_type="text/html"):
     """
     Store raw content (e.g., HTML) in S3
@@ -25,7 +61,7 @@ def store_raw_content(url, content, content_type="text/html"):
     safe_name = url.replace('https://', '').replace('http://', '').replace('/', '_')
     key = f"{S3_RAW_CONTENT_PATH}{safe_name}.html"
     
-    try:
+    def _store_operation():
         # Store the content in S3
         s3.put_object(
             Bucket=S3_BUCKET_NAME,
@@ -41,6 +77,9 @@ def store_raw_content(url, content, content_type="text/html"):
             'url': url,
             'timestamp': datetime.now().isoformat()
         }
+    
+    try:
+        return _s3_operation_with_retry(_store_operation)
     except Exception as e:
         return {
             'status': 'error',
@@ -56,7 +95,7 @@ def get_raw_content(url):
     safe_name = url.replace('https://', '').replace('http://', '').replace('/', '_')
     key = f"{S3_RAW_CONTENT_PATH}{safe_name}.html"
     
-    try:
+    def _get_operation():
         # Get the content from S3
         response = s3.get_object(
             Bucket=S3_BUCKET_NAME,
@@ -73,6 +112,9 @@ def get_raw_content(url):
             'key': key,
             'metadata': response.get('Metadata', {})
         }
+    
+    try:
+        return _s3_operation_with_retry(_get_operation)
     except Exception as e:
         return {
             'status': 'error',
@@ -198,61 +240,75 @@ def list_index_data():
             'error': str(e)
         }
 
-def store_metadata(key, metadata):
+def store_metadata(path, metadata):
     """
-    Store system metadata in S3
-    """
-    metadata_key = f"{S3_METADATA_PATH}{key}.json"
+    Store JSON metadata in S3
     
-    try:
+    Args:
+        path (str): Path to store the metadata (without extension)
+        metadata (dict): Metadata to store
+    
+    Returns:
+        dict: Status of the operation
+    """
+    key = f"{S3_METADATA_PATH}{path}.json"
+    
+    def _store_metadata_operation():
         # Convert metadata to JSON
-        json_data = json.dumps(metadata)
+        metadata_json = json.dumps(metadata)
         
         # Store the metadata in S3
         s3.put_object(
             Bucket=S3_BUCKET_NAME,
-            Key=metadata_key,
-            Body=json_data,
+            Key=key,
+            Body=metadata_json,
             ContentType='application/json'
         )
         
         return {
             'status': 'success',
-            'bucket': S3_BUCKET_NAME,
-            'key': metadata_key
+            'key': key
         }
+    
+    try:
+        return _s3_operation_with_retry(_store_metadata_operation)
     except Exception as e:
         return {
             'status': 'error',
-            'error': str(e),
-            'key': key
+            'error': str(e)
         }
 
-def get_metadata(key):
+def get_metadata(path):
     """
-    Retrieve system metadata from S3
-    """
-    metadata_key = f"{S3_METADATA_PATH}{key}.json"
+    Get JSON metadata from S3
     
-    try:
+    Args:
+        path (str): Path of the metadata (without extension)
+    
+    Returns:
+        dict: Status and metadata
+    """
+    key = f"{S3_METADATA_PATH}{path}.json"
+    
+    def _get_metadata_operation():
         # Get the metadata from S3
         response = s3.get_object(
             Bucket=S3_BUCKET_NAME,
-            Key=metadata_key
+            Key=key
         )
         
-        # Extract and parse the JSON content
-        content = response['Body'].read().decode('utf-8')
-        metadata = json.loads(content)
+        metadata_json = response['Body'].read().decode('utf-8')
+        metadata = json.loads(metadata_json)
         
         return {
             'status': 'success',
-            'metadata': metadata,
-            'key': key
+            'metadata': metadata
         }
+    
+    try:
+        return _s3_operation_with_retry(_get_metadata_operation)
     except Exception as e:
         return {
             'status': 'error',
-            'error': str(e),
-            'key': key
+            'error': str(e)
         } 

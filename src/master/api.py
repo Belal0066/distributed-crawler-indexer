@@ -1,8 +1,9 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Body, Path, Query
 from typing import List, Optional, Dict
 from pydantic import BaseModel
 import uvicorn
 from .master_node import MasterNode
+from common.fault_tolerance import fault_manager
 
 # Initialize FastAPI app
 app = FastAPI(title="Crawler-Indexer API", description="API for distributed crawler and indexer")
@@ -64,16 +65,22 @@ def search(request: SearchRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/health", response_model=Dict)
+@app.get("/health")
 def check_health():
-    """
-    Check the health of the system
-    """
-    try:
-        health_status = master_node.check_health()
-        return health_status
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    """Check system health"""
+    return master_node.check_health()
+
+# Add fault tolerance endpoints
+@app.get("/fault-tolerance")
+def get_fault_tolerance_status():
+    """Get fault tolerance status"""
+    return master_node.check_fault_tolerance()
+
+@app.get("/fault-tolerance/nodes")
+def get_nodes_status():
+    """Get status of all nodes"""
+    from common.monitor import check_node_health
+    return check_node_health(max_age=300)  # Get nodes seen in the last 5 minutes
 
 # Entry point
 if __name__ == "__main__":

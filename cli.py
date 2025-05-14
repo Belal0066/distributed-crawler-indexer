@@ -18,7 +18,7 @@ from rich.text import Text
 class CrawlerIndexerCLI(cmd.Cmd):
     def __init__(self):
         super().__init__()
-        self.master_url = "http://16.171.111.186:8000"  # Master node URL with port
+        self.master_url = "http://13.61.155.34:8000"  # Master node URL with port
         self.current_crawl_id = None
         self.debug = False
         self.console = Console()
@@ -330,7 +330,7 @@ class CrawlerIndexerCLI(cmd.Cmd):
                 task = progress.add_task("[cyan]Checking system health...", total=None)
                 response = requests.get(
                     f"{self.master_url}/health",
-                    timeout=10
+                    timeout=22
                 )
                 progress.update(task, completed=True)
             
@@ -349,7 +349,7 @@ class CrawlerIndexerCLI(cmd.Cmd):
             table.add_row("Overall Status", data.get('status', 'unknown'))
             table.add_row("Crawl Queue", data.get('crawl_queue', 'unknown'))
             table.add_row("Indexer Queue", data.get('indexer_queue', 'unknown'))
-            table.add_row("Elasticsearch", data.get('elasticsearch', 'unknown'))
+            # table.add_row("Elasticsearch", data.get('elasticsearch', 'unknown'))
             
             self.console.print(table)
             
