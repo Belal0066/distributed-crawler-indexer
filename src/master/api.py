@@ -22,7 +22,7 @@ class SearchRequest(BaseModel):
     query: str
     search_type: Optional[str] = "match"
     limit: Optional[int] = 10
-    fetch_content: Optional[bool] = False
+    fetch_content: Optional[bool] = True
 
 # API routes
 @app.get("/")
