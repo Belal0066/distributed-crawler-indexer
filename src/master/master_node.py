@@ -31,8 +31,13 @@ class MasterNode:
             aws_secret_access_key=AWS_SECRET_ACCESS_KEY
         )
         
-        # Initialize Elasticsearch
-        self.es = Elasticsearch(os.getenv("ES_HOST", "http://localhost:9200").split())
+        # Initialize Elasticsearch with longer timeout and retry configuration
+        self.es = Elasticsearch(
+            hosts=[os.getenv("ES_HOST", "http://localhost:9200")],
+            request_timeout=60,  # 60 second timeout
+            retry_on_timeout=True,
+            max_retries=3
+        )
         
         # Get queue URLs
         self.get_queue_urls()
@@ -282,8 +287,16 @@ class MasterNode:
             return results
         except Exception as e:
             logger.error(f"Search failed: {str(e)}", exc_info=True)
-            # Re-raise the exception to be handled by the API
-            raise
+            # Track the error
+            self.monitor.update_metric('search_errors', 1)
+            # Provide a clear message for API error handling
+            error_msg = f"Search operation failed: {str(e)}"
+            if "ConnectionTimeout" in str(e) or "timed out" in str(e).lower():
+                error_msg = "Elasticsearch connection timed out. The search index may be temporarily unavailable."
+            elif "ConnectionError" in str(e):
+                error_msg = "Could not connect to Elasticsearch. The search service may be down."
+            # Re-raise with a more informative message
+            raise Exception(error_msg)
 
     def check_health(self) -> Dict:
         """Check the overall system health."""

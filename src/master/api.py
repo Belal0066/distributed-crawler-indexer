@@ -70,7 +70,19 @@ def search(request: SearchRequest):
         )
         return results
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        # Log the error
+        error_msg = str(e)
+        error_code = 500
+        
+        # Return appropriate status codes based on error type
+        if "connection timed out" in error_msg.lower() or "timed out" in error_msg.lower():
+            error_code = 503  # Service Unavailable
+            error_msg = "Search service temporarily unavailable: connection timed out"
+        elif "could not connect" in error_msg.lower():
+            error_code = 503  # Service Unavailable
+            error_msg = "Search service temporarily unavailable: connection failed"
+        
+        raise HTTPException(status_code=error_code, detail=error_msg)
 
 @app.get("/health")
 def check_health():
