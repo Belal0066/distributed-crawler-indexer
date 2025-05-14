@@ -188,11 +188,11 @@ class FaultToleranceManager:
         """Get the current fault tolerance status"""
         return {
             'active': self.running,
-            'monitored_nodes': len(self.last_check),
+            # 'monitored_nodes': len(self.last_check),
             'active_tasks': len(self.task_assignments),
             'node_timeout': self.node_timeout,
             'task_timeout': self.task_timeout,
-            'replication_factor': self.replication_factor
+            # 'replication_factor': self.replication_factor
         }
 
 # Create a global instance

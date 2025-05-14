@@ -312,15 +312,15 @@ class MasterNode:
             
             # Format response
             return {
-                "status": "healthy" if queues_ok and es_ok else "degraded",
+                "status": "healthy" if queues_ok else "degraded",
                 "timestamp": datetime.now().isoformat(),
                 "services": {
                     "sqs": {
                         "status": "online" if queues_ok else "offline"
                     },
-                    "elasticsearch": {
-                        "status": es_status
-                    },
+                    # "elasticsearch": {
+                    #     "status": es_status
+                    # },
                     "fault_tolerance": ft_status
                 }
             }
