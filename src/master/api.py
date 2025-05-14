@@ -21,6 +21,8 @@ class CrawlRequest(BaseModel):
 class SearchRequest(BaseModel):
     query: str
     search_type: Optional[str] = "match"
+    limit: Optional[int] = 10
+    fetch_content: Optional[bool] = False
 
 # API routes
 @app.get("/")
@@ -60,7 +62,12 @@ def search(request: SearchRequest):
     Search through the indexed content
     """
     try:
-        results = master_node.search_content(request.query, search_type=request.search_type)
+        results = master_node.search_content(
+            request.query, 
+            search_type=request.search_type,
+            limit=request.limit,
+            fetch_content=request.fetch_content
+        )
         return results
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

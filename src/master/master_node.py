@@ -174,7 +174,7 @@ class MasterNode:
         # Join tokens back into a single string
         return " ".join(stemmed_tokens)
 
-    def search_content(self, query: str, search_type: str = "match") -> List[Dict]:
+    def search_content(self, query: str, search_type: str = "match", limit: int = 10, fetch_content: bool = False) -> List[Dict]:
         """Search through indexed content using Elasticsearch with different search types."""
         if not query:
             return []
@@ -197,6 +197,7 @@ class MasterNode:
                             "type": "phrase"
                         }
                     },
+                    "size": limit,
                     "highlight": {
                         "fields": {
                             "content": {},
@@ -213,6 +214,7 @@ class MasterNode:
                             "fields": ["content", "meta_data.title^2", "meta_data.description"]
                         }
                     },
+                    "size": limit,
                     "highlight": {
                         "fields": {
                             "content": {},
@@ -231,6 +233,7 @@ class MasterNode:
                             "fuzziness": "AUTO"
                         }
                     },
+                    "size": limit,
                     "highlight": {
                         "fields": {
                             "content": {},
@@ -240,7 +243,10 @@ class MasterNode:
                     }
                 }
             logger.debug(f"Elasticsearch query: {search_query}")
-            response = self.es.search(index="snipdex", body=search_query)
+            
+            # Set a timeout for Elasticsearch search
+            response = self.es.search(index="snipdex", body=search_query, request_timeout=30)
+            
             logger.debug(f"Elasticsearch response: {response}")
             results = []
             for hit in response['hits']['hits']:
@@ -251,14 +257,15 @@ class MasterNode:
                 content_highlight = ' '.join(highlights.get('content', [])) if highlights.get('content') else None
                 title_highlight = ' '.join(highlights.get('meta_data.title', [])) if highlights.get('meta_data.title') else None
 
-                # Fetch raw content from S3
+                # Fetch raw content from S3 only if explicitly requested
                 raw_content = None
-                try:
-                    s3_result = get_raw_content(url)
-                    if s3_result.get("status") == "success":
-                        raw_content = s3_result.get("content")
-                except Exception as e:
-                    logger.error(f"Failed to fetch raw content for {url}: {e}")
+                if fetch_content:
+                    try:
+                        s3_result = get_raw_content(url)
+                        if s3_result.get("status") == "success":
+                            raw_content = s3_result.get("content")
+                    except Exception as e:
+                        logger.error(f"Failed to fetch raw content for {url}: {e}")
 
                 results.append({
                     'url': url,
@@ -275,8 +282,8 @@ class MasterNode:
             return results
         except Exception as e:
             logger.error(f"Search failed: {str(e)}", exc_info=True)
-            self.monitor.update_metric('errors', 1)
-            raise Exception(f"Search failed: {str(e)}")
+            # Re-raise the exception to be handled by the API
+            raise
 
     def check_health(self) -> Dict:
         """Check the overall system health."""

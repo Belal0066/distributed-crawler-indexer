@@ -158,7 +158,7 @@ class CrawlerIndexerCLI(cmd.Cmd):
                 response = requests.post(
                     f"{self.master_url}/crawl",
                     json=config,
-                    timeout=30
+                    timeout=50
                 )
                 progress.update(task, completed=True)
             
@@ -210,7 +210,7 @@ class CrawlerIndexerCLI(cmd.Cmd):
                 task = progress.add_task("[cyan]Fetching status...", total=None)
                 response = requests.get(
                     f"{self.master_url}/job/{self.current_crawl_id}",
-                    timeout=10
+                    timeout=50
                 )
                 progress.update(task, completed=True)
             
@@ -259,11 +259,23 @@ class CrawlerIndexerCLI(cmd.Cmd):
             choices=["match", "phrase", "boolean"],
             default="match"
         )
+        
+        # Prompt for limit
+        limit = IntPrompt.ask(
+            "Maximum results to return",
+            default=10
+        )
+        
+        # Ask if detailed content should be fetched (can be slow)
+        fetch_content = Confirm.ask(
+            "Fetch detailed content? (slower)",
+            default=False
+        )
 
         try:
             if self.debug:
                 self.console.print(f"Sending request to: {self.master_url}/search")
-                self.console.print(f"Query parameters: {{'query': {arg}, 'search_type': {search_type}}}")
+                self.console.print(f"Query parameters: {{'query': {arg}, 'search_type': {search_type}, 'limit': {limit}, 'fetch_content': {fetch_content}}}")
 
             with Progress(
                 SpinnerColumn(),
@@ -273,8 +285,13 @@ class CrawlerIndexerCLI(cmd.Cmd):
                 task = progress.add_task("[cyan]Searching...", total=None)
                 response = requests.post(
                     f"{self.master_url}/search",
-                    json={"query": arg, "search_type": search_type},
-                    timeout=10
+                    json={
+                        "query": arg, 
+                        "search_type": search_type,
+                        "limit": limit,
+                        "fetch_content": fetch_content
+                    },
+                    timeout=60  # Increased timeout to 60 seconds
                 )
                 progress.update(task, completed=True)
             
@@ -330,7 +347,7 @@ class CrawlerIndexerCLI(cmd.Cmd):
                 task = progress.add_task("[cyan]Checking system health...", total=None)
                 response = requests.get(
                     f"{self.master_url}/health",
-                    timeout=22
+                    timeout=50
                 )
                 progress.update(task, completed=True)
             
