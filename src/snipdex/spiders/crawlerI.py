@@ -12,6 +12,7 @@ import sys
 import socket
 import uuid
 from src.common.fault_tolerance import fault_manager
+import requests
 
 # Add the project root to the path to import common modules
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..')))
@@ -295,11 +296,11 @@ class CrawleriSpider(scrapy.Spider):
     def __init__(self, start_urls=None, allowed_domains=None, job_id=None, depth=None, task_id=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if start_urls:
-            self.start_urls = start_urls.split(",")
+            self.start_urls = start_urls.split(',') if isinstance(start_urls, str) else start_urls
         if allowed_domains:
-            self.allowed_domains = allowed_domains.split(",")
+            self.allowed_domains = allowed_domains.split(',') if isinstance(allowed_domains, str) else allowed_domains
         self.job_id = job_id
-        self.depth = int(depth) if depth else None
+        self.depth = int(depth) if depth else 1
         self.task_id = task_id
         
         # Send task progress status
@@ -370,6 +371,24 @@ class CrawleriSpider(scrapy.Spider):
                 seen.add(link)
                 unique_links.append(link)
         item["links"] = unique_links
+
+        # If depth > 1, send extracted URLs to master for recursive crawling
+        if self.depth and self.depth > 1 and unique_links:
+            try:
+                api_url = os.getenv("MASTER_API_URL", "http://localhost:8000/crawl/recursive")
+                payload = {
+                    "urls": unique_links,
+                    "allowed_domains": self.allowed_domains,
+                    "job_id": self.job_id,
+                    "depth": self.depth
+                }
+                resp = requests.post(api_url, json=payload, timeout=30)
+                if resp.ok:
+                    self.logger.info(f"Submitted {len(unique_links)} URLs for recursive crawling to master.")
+                else:
+                    self.logger.error(f"Failed to submit recursive URLs: {resp.text}")
+            except Exception as e:
+                self.logger.error(f"Error submitting recursive URLs: {e}")
 
         # Apply fallback defaults
         for field, default in {

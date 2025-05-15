@@ -68,10 +68,9 @@ class MasterNode:
 
     def submit_crawl_job(self, urls: List[str], allowed_domains: Optional[List[str]] = None, 
                         job_id: Optional[str] = None, depth: int = 1) -> Dict:
-        """Submit a new crawl job and trigger indexing."""
+        """Submit a new crawl job and trigger indexing. Also supports recursive crawling by depth."""
         if not job_id:
             job_id = f"job-{int(time.time())}"
-        
         # Create job metadata
         job_metadata = {
             'job_id': job_id,
@@ -82,10 +81,8 @@ class MasterNode:
             'submission_time': datetime.now().isoformat(),
             'task_ids': []
         }
-        
         # Store job metadata in S3
         store_metadata(f"jobs/{job_id}", job_metadata)
-        
         task_ids = []
         for url in urls:
             # Create task message
@@ -99,21 +96,17 @@ class MasterNode:
                 'task_type': 'crawl',
                 'timestamp': datetime.now().isoformat()
             }
-            
             # Submit task to SQS
-            response = self.sqs.send_message(
+            self.sqs.send_message(
                 QueueUrl=self.crawl_queue_url,
                 MessageBody=json.dumps(task_data)
             )
-            
             task_ids.append(task_id)
             self.monitor.update_metric('tasks_created', 1)
-        
         # Update job metadata with task IDs
         job_metadata['task_ids'] = task_ids
         job_metadata['status'] = 'in_progress'
         store_metadata(f"jobs/{job_id}", job_metadata)
-        
         return {
             'job_id': job_id,
             'status': "submitted",
@@ -121,6 +114,11 @@ class MasterNode:
             'index_status': "pending",
             'task_count': len(task_ids)
         }
+
+    def submit_recursive_crawl_tasks(self, urls: List[str], allowed_domains: Optional[List[str]], job_id: str, depth: int):
+        """Submit new crawl tasks for extracted URLs if depth > 1."""
+        if depth > 1:
+            self.submit_crawl_job(urls, allowed_domains, job_id, depth-1)
 
     def get_job_status(self, job_id: str) -> Dict:
         """Get the status of both crawl and index jobs."""

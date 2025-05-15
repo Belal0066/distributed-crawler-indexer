@@ -24,6 +24,12 @@ class SearchRequest(BaseModel):
     limit: Optional[int] = 10
     fetch_content: Optional[bool] = True
 
+class RecursiveCrawlRequest(BaseModel):
+    urls: List[str]
+    allowed_domains: Optional[List[str]] = None
+    job_id: str
+    depth: int
+
 # API routes
 @app.get("/")
 def read_root():
@@ -42,6 +48,22 @@ def crawl(request: CrawlRequest):
             depth=request.depth
         )
         return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/crawl/recursive", response_model=Dict)
+def crawl_recursive(request: RecursiveCrawlRequest):
+    """
+    Submit extracted URLs for recursive crawling (used by crawler workers).
+    """
+    try:
+        result = master_node.submit_recursive_crawl_tasks(
+            urls=request.urls,
+            allowed_domains=request.allowed_domains,
+            job_id=request.job_id,
+            depth=request.depth
+        )
+        return {"status": "submitted", "task_count": len(request.urls)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
