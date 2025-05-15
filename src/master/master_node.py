@@ -116,9 +116,12 @@ class MasterNode:
         }
 
     def submit_recursive_crawl_tasks(self, urls: List[str], allowed_domains: Optional[List[str]], job_id: str, depth: int):
-        """Submit new crawl tasks for extracted URLs if depth > 1."""
+        """Submit new crawl tasks for extracted URLs if depth > 1, batching to avoid SQS message size errors."""
         if depth > 1:
-            self.submit_crawl_job(urls, allowed_domains, job_id, depth-1)
+            BATCH_SIZE = 50  # Tune as needed to keep SQS messages small
+            for i in range(0, len(urls), BATCH_SIZE):
+                batch = urls[i:i+BATCH_SIZE]
+                self.submit_crawl_job(batch, allowed_domains, job_id, depth-1)
 
     def get_job_status(self, job_id: str) -> Dict:
         """Get the status of both crawl and index jobs."""

@@ -370,6 +370,8 @@ class CrawleriSpider(scrapy.Spider):
             if link not in seen:
                 seen.add(link)
                 unique_links.append(link)
+        # Limit to 5 unique links per page
+        unique_links = unique_links[:5]
         item["links"] = unique_links
 
         # If depth > 1, send extracted URLs to master for recursive crawling
